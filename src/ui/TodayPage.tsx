@@ -12,13 +12,15 @@ import { computeDayStats } from '../domain/scoring';
 import type { TimeSlot } from '../domain/types';
 import { useIntervalNotifications } from '../hooks/useIntervalNotifications';
 import { RecordSheet } from './RecordSheet';
+import { SleepQuickAddSheet } from './SleepQuickAddSheet';
 
 export function TodayPage() {
-  const { data, saveIntervalLog } = useStore();
+  const { data, saveIntervalLog, saveSleepForSlots } = useStore();
   const { categories, activities } = useSortedCatalog(data);
   const [viewDate, setViewDate] = useState(todayKey());
   const [activeSlot, setActiveSlot] = useState<TimeSlot | null>(null);
   const [catchUpDismissed, setCatchUpDismissed] = useState(false);
+  const [sleepOpen, setSleepOpen] = useState(false);
   const nowRef = useRef(new Date());
   const [, tick] = useState(0);
 
@@ -113,6 +115,9 @@ export function TodayPage() {
               Jump to today
             </button>
           )}
+          <button type="button" className="btn" onClick={() => setSleepOpen(true)}>
+            😴 Add sleep
+          </button>
         </div>
       </div>
 
@@ -186,6 +191,14 @@ export function TodayPage() {
             <p className="muted" style={{ margin: '0.25rem 0 0' }}>
               {dayStats.loggedCount} of {dayStats.totalSlots} intervals
             </p>
+            <button
+              type="button"
+              className="btn"
+              style={{ marginTop: '1rem', width: '100%' }}
+              onClick={() => setSleepOpen(true)}
+            >
+              😴 Add sleep
+            </button>
           </div>
         </aside>
       </div>
@@ -198,6 +211,17 @@ export function TodayPage() {
         >
           Log current interval
         </button>
+      )}
+
+      {sleepOpen && (
+        <SleepQuickAddSheet
+          dateLabel={formatDisplayDate(viewDate)}
+          slots={slots}
+          activities={activities}
+          intervalMinutes={interval}
+          onClose={() => setSleepOpen(false)}
+          onSave={(picked) => saveSleepForSlots(picked)}
+        />
       )}
 
       {activeSlot && (

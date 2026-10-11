@@ -591,6 +591,71 @@ a {
   color: var(--muted);
 }
 
+.sleep-sheet .sleep-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.sleep-range-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.sleep-range-label select {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.sleep-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.sleep-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+}
+
+.sleep-interval-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  max-height: min(40vh, 320px);
+  overflow: auto;
+  padding: 0.25rem 0 1rem;
+  flex: 1;
+}
+
+.sleep-interval-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.sleep-interval-chip.is-on {
+  border-color: var(--accent);
+  background: rgba(31, 78, 95, 0.12);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.sleep-interval-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     scroll-behavior: auto !important;

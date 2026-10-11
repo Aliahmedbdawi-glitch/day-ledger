@@ -17,12 +17,15 @@ import type {
   TimeSlot,
 } from '../domain/types';
 import { addDays, todayKey } from '../domain/dates';
+import { findSleepActivity } from '../domain/sleep';
 import { createExampleSeed } from './seed';
 import { loadData, saveData } from './storage';
 
 interface StoreValue {
   data: AppData;
   saveIntervalLog: (slot: TimeSlot, activityIds: string[]) => void;
+  saveIntervalLogsBatch: (slots: TimeSlot[], activityIds: string[]) => void;
+  saveSleepForSlots: (slots: TimeSlot[]) => void;
   updateSettings: (patch: Partial<Settings>) => void;
   setDefaultInterval: (minutes: IntervalMinutes) => void;
   seedExampleData: () => void;
@@ -90,6 +93,71 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         (l) => !(l.date === slot.date && l.startTime === slot.startTime),
       );
       return { ...prev, logs: [...rest, log] };
+    });
+  }, [persist]);
+
+  const saveIntervalLogsBatch = useCallback((slots: TimeSlot[], activityIds: string[]) => {
+    if (slots.length === 0) return;
+    persist((prev) => {
+      const recordedAt = new Date().toISOString();
+      const keys = new Set(slots.map((s) => `${s.date}|${s.startTime}`));
+      const rest = prev.logs.filter((l) => !keys.has(`${l.date}|${l.startTime}`));
+      const newLogs: IntervalLog[] = slots.map((slot) => ({
+        date: slot.date,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        activityIds,
+        recordedAt,
+      }));
+      return { ...prev, logs: [...rest, ...newLogs] };
+    });
+  }, [persist]);
+
+  const saveSleepForSlots = useCallback((slots: TimeSlot[]) => {
+    if (slots.length === 0) return;
+    persist((prev) => {
+      let categories = prev.categories;
+      let activities = prev.activities;
+      let sleep = findSleepActivity(activities);
+      if (!sleep) {
+        let healthId = categories.find((c) => c.name.trim().toLowerCase() === 'health')?.id;
+        if (!healthId) {
+          healthId = crypto.randomUUID();
+          const maxOrder = categories.reduce((m, c) => Math.max(m, c.sortOrder), -1);
+          categories = [
+            ...categories,
+            {
+              id: healthId,
+              name: 'Health',
+              icon: '😴',
+              color: '#2F7D4A',
+              sortOrder: maxOrder + 1,
+            },
+          ];
+        }
+        const inCat = activities.filter((a) => a.categoryId === healthId);
+        const maxOrder = inCat.reduce((m, a) => Math.max(m, a.sortOrder), -1);
+        sleep = {
+          id: crypto.randomUUID(),
+          categoryId: healthId,
+          name: 'Sleep',
+          points: 40,
+          sortOrder: maxOrder + 1,
+        };
+        activities = [...activities, sleep];
+      }
+
+      const recordedAt = new Date().toISOString();
+      const keys = new Set(slots.map((s) => `${s.date}|${s.startTime}`));
+      const rest = prev.logs.filter((l) => !keys.has(`${l.date}|${l.startTime}`));
+      const newLogs: IntervalLog[] = slots.map((slot) => ({
+        date: slot.date,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        activityIds: [sleep!.id],
+        recordedAt,
+      }));
+      return { ...prev, categories, activities, logs: [...rest, ...newLogs] };
     });
   }, [persist]);
 
@@ -234,6 +302,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     () => ({
       data,
       saveIntervalLog,
+      saveIntervalLogsBatch,
+      saveSleepForSlots,
       updateSettings,
       setDefaultInterval,
       seedExampleData,
@@ -249,6 +319,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [
       data,
       saveIntervalLog,
+      saveIntervalLogsBatch,
+      saveSleepForSlots,
       updateSettings,
       setDefaultInterval,
       seedExampleData,
