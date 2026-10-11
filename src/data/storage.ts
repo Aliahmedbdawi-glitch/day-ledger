@@ -8,6 +8,8 @@ export function defaultSettings(): Settings {
     notificationsEnabled: true,
     trackedDayTargetPercent: 80,
     seeded: false,
+    defaultSleepDurationHours: 8,
+    defaultSleepEndTime: '07:00',
   };
 }
 

@@ -15,7 +15,7 @@ import { RecordSheet } from './RecordSheet';
 import { SleepQuickAddSheet } from './SleepQuickAddSheet';
 
 export function TodayPage() {
-  const { data, saveIntervalLog, saveSleepForSlots } = useStore();
+  const { data, saveIntervalLog, saveSleepForSlots, updateSettings } = useStore();
   const { categories, activities } = useSortedCatalog(data);
   const [viewDate, setViewDate] = useState(todayKey());
   const [activeSlot, setActiveSlot] = useState<TimeSlot | null>(null);
@@ -219,8 +219,18 @@ export function TodayPage() {
           slots={slots}
           activities={activities}
           intervalMinutes={interval}
+          sleepDefaults={{
+            durationHours: data.settings.defaultSleepDurationHours,
+            endTime: data.settings.defaultSleepEndTime,
+          }}
           onClose={() => setSleepOpen(false)}
           onSave={(picked) => saveSleepForSlots(picked)}
+          onSaveSleepDefaults={(d) =>
+            updateSettings({
+              defaultSleepDurationHours: d.durationHours,
+              defaultSleepEndTime: d.endTime,
+            })
+          }
         />
       )}
 

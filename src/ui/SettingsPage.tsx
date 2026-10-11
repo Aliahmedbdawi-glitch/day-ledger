@@ -63,6 +63,34 @@ export function SettingsPage() {
       </div>
 
       <div className="card settings-group">
+        <h3>Default sleep</h3>
+        <p className="muted">Used when you open Add sleep. Also updated when you save sleep or tap Save as default.</p>
+        <div className="form-row">
+          <label>
+            Duration (hours)
+            <select
+              value={settings.defaultSleepDurationHours}
+              onChange={(e) =>
+                updateSettings({ defaultSleepDurationHours: Number(e.target.value) })
+              }
+            >
+              {[5, 6, 7, 8, 9, 10, 11, 12].map((h) => (
+                <option key={h} value={h}>{h} hours</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Wake time (end of sleep)
+            <input
+              type="time"
+              value={settings.defaultSleepEndTime}
+              onChange={(e) => updateSettings({ defaultSleepEndTime: e.target.value })}
+            />
+          </label>
+        </div>
+      </div>
+
+      <div className="card settings-group">
         <h3>Productive day</h3>
         <label>
           Tracked-day target (%)

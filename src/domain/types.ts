@@ -31,6 +31,10 @@ export interface Settings {
   notificationsEnabled: boolean;
   trackedDayTargetPercent: number;
   seeded: boolean;
+  /** Typical sleep length for quick-add (hours). */
+  defaultSleepDurationHours: number;
+  /** Wake time: end of the last sleep slot (HH:mm). */
+  defaultSleepEndTime: string;
 }
 
 export interface AppData {

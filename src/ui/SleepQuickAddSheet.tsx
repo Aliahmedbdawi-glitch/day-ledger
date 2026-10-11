@@ -1,17 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Activity, TimeSlot } from '../domain/types';
 import { formatDurationMinutes } from '../domain/dates';
-import { findSleepActivity, slotCountForHours, slotsBetweenInclusive } from '../domain/sleep';
+import {
+  findSleepActivity,
+  selectionFromSleepDefaults,
+  sleepDefaultsFromSelection,
+  slotCountForHours,
+  slotsBetweenInclusive,
+} from '../domain/sleep';
 
 const DURATION_HOURS = [6, 7, 8, 9];
+
+export interface SleepDefaults {
+  durationHours: number;
+  endTime: string;
+}
 
 interface Props {
   dateLabel: string;
   slots: TimeSlot[];
   activities: Activity[];
   intervalMinutes: number;
+  sleepDefaults: SleepDefaults;
   onClose: () => void;
   onSave: (slots: TimeSlot[]) => void;
+  onSaveSleepDefaults: (defaults: SleepDefaults) => void;
 }
 
 export function SleepQuickAddSheet({
@@ -19,29 +32,41 @@ export function SleepQuickAddSheet({
   slots,
   activities,
   intervalMinutes,
+  sleepDefaults,
   onClose,
   onSave,
+  onSaveSleepDefaults,
 }: Props) {
   const sleepActivity = findSleepActivity(activities);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [endIndex, setEndIndex] = useState(() => Math.max(0, slots.length - 1));
+  const [activeDuration, setActiveDuration] = useState(sleepDefaults.durationHours);
 
   const slotKey = (s: TimeSlot) => s.startTime;
 
-  useEffect(() => {
+  const applyDefaults = (defaults: SleepDefaults) => {
     if (slots.length === 0) return;
-    const count = slotCountForHours(8, intervalMinutes);
-    const end = Math.min(slots.length - 1, Math.floor(slots.length / 3));
+    const { endIndex: end, selectedStartTimes } = selectionFromSleepDefaults(
+      slots,
+      intervalMinutes,
+      defaults.durationHours,
+      defaults.endTime,
+    );
     setEndIndex(end);
-    const picked = slotsBetweenInclusive(slots, Math.max(0, end - count + 1), end);
-    setSelected(new Set(picked.map(slotKey)));
-  }, [slots, intervalMinutes]);
+    setActiveDuration(defaults.durationHours);
+    setSelected(selectedStartTimes);
+  };
+
+  useEffect(() => {
+    applyDefaults(sleepDefaults);
+  }, [slots, intervalMinutes, sleepDefaults.durationHours, sleepDefaults.endTime]);
 
   const applyDuration = (hours: number) => {
     const count = slotCountForHours(hours, intervalMinutes);
     const end = Math.min(endIndex, slots.length - 1);
     const start = Math.max(0, end - count + 1);
     const picked = slotsBetweenInclusive(slots, start, end);
+    setActiveDuration(hours);
     setSelected(new Set(picked.map(slotKey)));
   };
 
@@ -49,6 +74,7 @@ export function SleepQuickAddSheet({
     const picked = slotsBetweenInclusive(slots, fromIndex, toIndex);
     setSelected(new Set(picked.map(slotKey)));
     setEndIndex(Math.max(fromIndex, toIndex));
+    setActiveDuration(Math.round((picked.length * intervalMinutes) / 60));
   };
 
   const toggle = (slot: TimeSlot) => {
@@ -70,8 +96,23 @@ export function SleepQuickAddSheet({
 
   const handleSave = () => {
     if (selectedSlots.length === 0) return;
+    const defaults = sleepDefaultsFromSelection(selectedSlots, intervalMinutes);
+    onSaveSleepDefaults(defaults);
     onSave(selectedSlots);
     onClose();
+  };
+
+  const handleSaveAsDefaultOnly = () => {
+    const defaults = sleepDefaultsFromSelection(selectedSlots, intervalMinutes);
+    if (selectedSlots.length > 0) {
+      onSaveSleepDefaults(defaults);
+    } else {
+      const endSlot = slots[endIndex];
+      onSaveSleepDefaults({
+        durationHours: activeDuration,
+        endTime: endSlot?.endTime ?? sleepDefaults.endTime,
+      });
+    }
   };
 
   return (
@@ -94,6 +135,11 @@ export function SleepQuickAddSheet({
           </p>
         )}
 
+        <p className="muted" style={{ marginTop: 0, fontSize: '0.85rem' }}>
+          Default: {sleepDefaults.durationHours}h ending at{' '}
+          <span className="mono">{sleepDefaults.endTime}</span>
+        </p>
+
         <div className="sleep-controls">
           <label className="sleep-range-label">
             End at
@@ -102,6 +148,7 @@ export function SleepQuickAddSheet({
               onChange={(e) => {
                 const idx = Number(e.target.value);
                 setEndIndex(idx);
+                applyDuration(activeDuration);
               }}
             >
               {slots.map((s) => (
@@ -113,7 +160,12 @@ export function SleepQuickAddSheet({
           </label>
           <div className="sleep-presets" role="group" aria-label="Sleep duration">
             {DURATION_HOURS.map((h) => (
-              <button key={h} type="button" className="btn" onClick={() => applyDuration(h)}>
+              <button
+                key={h}
+                type="button"
+                className={`btn${activeDuration === h ? ' btn-primary' : ''}`}
+                onClick={() => applyDuration(h)}
+              >
                 {h}h
               </button>
             ))}
@@ -122,15 +174,20 @@ export function SleepQuickAddSheet({
             <button
               type="button"
               className="btn btn-ghost"
-              onClick={() => applyRange(0, Math.min(slots.length - 1, slotCountForHours(8, intervalMinutes) - 1))}
+              onClick={() => applyDefaults(sleepDefaults)}
             >
-              Early morning block
+              Use saved default
             </button>
             <button
               type="button"
               className="btn btn-ghost"
-              onClick={() => setSelected(new Set())}
+              onClick={() =>
+                applyRange(0, Math.min(slots.length - 1, slotCountForHours(8, intervalMinutes) - 1))
+              }
             >
+              Early morning block
+            </button>
+            <button type="button" className="btn btn-ghost" onClick={() => setSelected(new Set())}>
               Clear
             </button>
           </div>
@@ -162,6 +219,9 @@ export function SleepQuickAddSheet({
             {selectedSlots.length} interval{selectedSlots.length === 1 ? '' : 's'} ·{' '}
             {formatDurationMinutes(totalMinutes)}
           </p>
+          <button type="button" className="btn" onClick={handleSaveAsDefaultOnly}>
+            Save as default
+          </button>
           <button
             type="button"
             className="btn btn-primary"
