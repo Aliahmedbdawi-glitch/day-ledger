@@ -1,4 +1,5 @@
 import type { AppData, Settings } from '../domain/types';
+import { todayKey } from '../domain/dates';
 
 const STORAGE_KEY = 'day-ledger-v1';
 
@@ -10,6 +11,13 @@ export function defaultSettings(): Settings {
     seeded: false,
     defaultSleepDurationHours: 8,
     defaultSleepEndTime: '07:00',
+    autoRegisterSleep: true,
+    autoSleepSince: todayKey(),
+    sleepLimitHours: 9,
+    oversleepPenaltyPerHour: 50,
+    quietDuringSleep: true,
+    unrecordedPenaltyPerHour: 10,
+    dailyPointsGoal: 400,
   };
 }
 
@@ -21,6 +29,7 @@ export function createEmptyData(): AppData {
     logs: [],
     settings: defaultSettings(),
     dayIntervalMinutes: {},
+    targets: [],
   };
 }
 

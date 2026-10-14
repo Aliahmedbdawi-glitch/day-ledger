@@ -7,11 +7,11 @@ export function RecordsPage() {
   const today = todayKey();
   const records = computePersonalRecords(data, today);
   const todayStats = computeDayStats(data, today);
-  const prevBest = records.highestDailyScore;
+  const prevBest = records.highestDailyNet;
   const isNewRecord =
-    todayStats.score !== null &&
+    todayStats.netPoints !== null &&
     prevBest !== null &&
-    todayStats.score >= prevBest.value &&
+    todayStats.netPoints >= prevBest.value &&
     prevBest.date === today;
 
   return (
@@ -20,26 +20,26 @@ export function RecordsPage() {
         <h1 className="page-title">Personal records</h1>
       </div>
 
-      {isNewRecord && todayStats.score !== null && (
+      {isNewRecord && todayStats.netPoints !== null && (
         <div className="card" style={{ marginBottom: '1rem', borderColor: 'var(--productive)' }}>
           <strong>New daily record</strong>
           <p style={{ margin: '0.5rem 0 0' }}>
-            Today&apos;s score: <strong>{todayStats.score}</strong>
+            Today&apos;s net points: <strong>{todayStats.netPoints}</strong>
           </p>
         </div>
       )}
 
       <ul className="record-list card">
         <li>
-          <span>Highest daily score</span>
+          <span>Highest daily net points</span>
           <strong>
-            {records.highestDailyScore
-              ? `${records.highestDailyScore.value} (${formatDisplayDate(records.highestDailyScore.date)})`
+            {records.highestDailyNet
+              ? `${records.highestDailyNet.value} (${formatDisplayDate(records.highestDailyNet.date)})`
               : '—'}
           </strong>
         </li>
         <li>
-          <span>Highest weekly average</span>
+          <span>Highest weekly average (net/day)</span>
           <strong>
             {records.highestWeeklyAverage
               ? `${records.highestWeeklyAverage.value} (week of ${formatDisplayDate(records.highestWeeklyAverage.weekStart)})`
@@ -64,9 +64,9 @@ export function RecordsPage() {
         </li>
       </ul>
 
-      {prevBest && todayStats.score !== null && !isNewRecord && (
+      {prevBest && todayStats.netPoints !== null && !isNewRecord && (
         <p className="muted" style={{ marginTop: '1rem' }}>
-          Previous best: {prevBest.value}. Today: {todayStats.score}.
+          Previous best: {prevBest.value}. Today: {todayStats.netPoints}.
         </p>
       )}
     </div>

@@ -11,13 +11,14 @@ import type {
   Activity,
   AppData,
   Category,
+  DailyTarget,
   IntervalLog,
   IntervalMinutes,
   Settings,
   TimeSlot,
 } from '../domain/types';
 import { addDays, todayKey } from '../domain/dates';
-import { findSleepActivity } from '../domain/sleep';
+import { applyAutoSleep, ensureSleepActivity, findSleepActivity } from '../domain/sleep';
 import { createExampleSeed } from './seed';
 import { loadData, saveData } from './storage';
 
@@ -37,6 +38,9 @@ interface StoreValue {
   updateActivity: (id: string, patch: Partial<Activity>) => void;
   deleteActivity: (id: string) => void;
   reorderActivity: (categoryId: string, id: string, direction: 'up' | 'down') => void;
+  addTarget: (target: Omit<DailyTarget, 'id'>) => void;
+  updateTarget: (id: string, patch: Partial<DailyTarget>) => void;
+  deleteTarget: (id: string) => void;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -80,6 +84,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setData((prev) => updater(prev));
   }, []);
 
+  // Auto-register sleep on launch and whenever a sleep window closes.
+  // applyAutoSleep returns the same object when there is nothing to fill, so this is a no-op re-render-wise.
+  useEffect(() => {
+    const run = () => persist((prev) => applyAutoSleep(prev, new Date()));
+    run();
+    const id = window.setInterval(run, 60_000);
+    return () => window.clearInterval(id);
+  }, [persist]);
+
   const saveIntervalLog = useCallback((slot: TimeSlot, activityIds: string[]) => {
     persist((prev) => {
       const log: IntervalLog = {
@@ -116,37 +129,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const saveSleepForSlots = useCallback((slots: TimeSlot[]) => {
     if (slots.length === 0) return;
     persist((prev) => {
-      let categories = prev.categories;
-      let activities = prev.activities;
-      let sleep = findSleepActivity(activities);
-      if (!sleep) {
-        let healthId = categories.find((c) => c.name.trim().toLowerCase() === 'health')?.id;
-        if (!healthId) {
-          healthId = crypto.randomUUID();
-          const maxOrder = categories.reduce((m, c) => Math.max(m, c.sortOrder), -1);
-          categories = [
-            ...categories,
-            {
-              id: healthId,
-              name: 'Health',
-              icon: '😴',
-              color: '#2F7D4A',
-              sortOrder: maxOrder + 1,
-            },
-          ];
-        }
-        const inCat = activities.filter((a) => a.categoryId === healthId);
-        const maxOrder = inCat.reduce((m, a) => Math.max(m, a.sortOrder), -1);
-        sleep = {
-          id: crypto.randomUUID(),
-          categoryId: healthId,
-          name: 'Sleep',
-          points: 40,
-          sortOrder: maxOrder + 1,
-        };
-        activities = [...activities, sleep];
-      }
-
+      const { categories, activities, sleep } = ensureSleepActivity(
+        prev.categories,
+        prev.activities,
+      );
       const recordedAt = new Date().toISOString();
       const keys = new Set(slots.map((s) => `${s.date}|${s.startTime}`));
       const rest = prev.logs.filter((l) => !keys.has(`${l.date}|${l.startTime}`));
@@ -154,7 +140,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         date: slot.date,
         startTime: slot.startTime,
         endTime: slot.endTime,
-        activityIds: [sleep!.id],
+        activityIds: [sleep.id],
         recordedAt,
       }));
       return { ...prev, categories, activities, logs: [...rest, ...newLogs] };
@@ -175,10 +161,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const seedExampleData = useCallback(() => {
     persist((prev) => {
       const seed = createExampleSeed();
+      // Keep the id of an auto-created Sleep activity so existing sleep logs stay attached.
+      const prevSleep = findSleepActivity(prev.activities);
+      const activities = prevSleep
+        ? seed.activities.map((a) =>
+            a.name === 'Sleep' ? { ...a, id: prevSleep.id, points: prevSleep.points } : a,
+          )
+        : seed.activities;
       return {
         ...prev,
         categories: seed.categories,
-        activities: seed.activities,
+        activities,
         settings: { ...prev.settings, seeded: true },
       };
     });
@@ -213,6 +206,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ...prev,
       categories: prev.categories.filter((c) => c.id !== id),
       activities: prev.activities.filter((a) => a.categoryId !== id),
+      targets: prev.targets.filter((t) => {
+        const act = prev.activities.find((a) => a.id === t.activityId);
+        return act?.categoryId !== id;
+      }),
       logs: prev.logs.map((l) => ({
         ...l,
         activityIds: l.activityIds.filter((aid) => {
@@ -242,7 +239,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [persist]);
 
   const addActivity = useCallback(
-    (categoryId: string, name: string, points = 50) => {
+    (categoryId: string, name: string, points = 0) => {
       persist((prev) => {
         const inCat = prev.activities.filter((a) => a.categoryId === categoryId);
         const maxOrder = inCat.reduce((m, a) => Math.max(m, a.sortOrder), -1);
@@ -274,7 +271,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ...l,
         activityIds: l.activityIds.filter((aid) => aid !== id),
       })),
+      targets: prev.targets.filter((t) => t.activityId !== id),
     }));
+  }, [persist]);
+
+  const addTarget = useCallback((target: Omit<DailyTarget, 'id'>) => {
+    persist((prev) => ({
+      ...prev,
+      targets: [...prev.targets, { ...target, id: crypto.randomUUID() }],
+    }));
+  }, [persist]);
+
+  const updateTarget = useCallback((id: string, patch: Partial<DailyTarget>) => {
+    persist((prev) => ({
+      ...prev,
+      targets: prev.targets.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+    }));
+  }, [persist]);
+
+  const deleteTarget = useCallback((id: string) => {
+    persist((prev) => ({ ...prev, targets: prev.targets.filter((t) => t.id !== id) }));
   }, [persist]);
 
   const reorderActivity = useCallback(
@@ -315,6 +331,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       updateActivity,
       deleteActivity,
       reorderActivity,
+      addTarget,
+      updateTarget,
+      deleteTarget,
     }),
     [
       data,
@@ -332,6 +351,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       updateActivity,
       deleteActivity,
       reorderActivity,
+      addTarget,
+      updateTarget,
+      deleteTarget,
     ],
   );
 

@@ -8,6 +8,7 @@ import {
   slotCountForHours,
   slotsBetweenInclusive,
 } from '../domain/sleep';
+import { Icon } from './Icon';
 
 const DURATION_HOURS = [6, 7, 8, 9];
 
@@ -96,8 +97,7 @@ export function SleepQuickAddSheet({
 
   const handleSave = () => {
     if (selectedSlots.length === 0) return;
-    const defaults = sleepDefaultsFromSelection(selectedSlots, intervalMinutes);
-    onSaveSleepDefaults(defaults);
+    // One-off nights don't change the schedule auto-register uses; "Save as default" does.
     onSave(selectedSlots);
     onClose();
   };
@@ -124,8 +124,8 @@ export function SleepQuickAddSheet({
             <h3 id="sleep-title">Add sleep</h3>
             <p className="muted" style={{ margin: '0.25rem 0 0' }}>{dateLabel}</p>
           </div>
-          <button type="button" className="btn btn-ghost" onClick={onClose} aria-label="Close">
-            ✕
+          <button type="button" className="btn btn-ghost btn-icon" onClick={onClose} aria-label="Close">
+            <Icon name="close" />
           </button>
         </div>
 

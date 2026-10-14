@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { useStore, useSortedCatalog } from '../data/store';
 
+function clampPoints(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(-100, Math.min(100, Math.round(value)));
+}
+
 export function ActivitiesPage() {
   const {
     data,
@@ -20,13 +25,19 @@ export function ActivitiesPage() {
   const [newCatIcon, setNewCatIcon] = useState('📁');
   const [newCatColor, setNewCatColor] = useState('#8A867C');
 
-  const empty = categories.length === 0;
+  // Auto-register may already have created Health › Sleep, so offer the example set until it's been loaded once.
+  const empty = !data.settings.seeded && activities.length <= 1;
 
   return (
     <div className="page">
       <div className="page-header">
         <h1 className="page-title">Activities</h1>
       </div>
+
+      <p className="muted" style={{ marginTop: 0 }}>
+        Points are earned per hour. Use <strong className="pts-pos">+</strong> for time well spent and{' '}
+        <strong className="pts-neg">−</strong> for time you want less of (e.g. scrolling).
+      </p>
 
       {empty && (
         <div className="card" style={{ marginBottom: '1rem' }}>
@@ -125,16 +136,25 @@ export function ActivitiesPage() {
                   onChange={(e) => updateActivity(act.id, { name: e.target.value })}
                   style={{ flex: 1, border: 'none', background: 'transparent' }}
                 />
+                <button
+                  type="button"
+                  className={`btn sign-toggle ${act.points < 0 ? 'is-neg' : 'is-pos'}`}
+                  title="Flip between gaining and losing points"
+                  onClick={() => updateActivity(act.id, { points: -act.points })}
+                >
+                  {act.points < 0 ? '−' : '+'}
+                </button>
                 <label className="muted" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  Points
                   <input
                     type="number"
-                    min={0}
+                    min={-100}
                     max={100}
                     value={act.points}
-                    onChange={(e) => updateActivity(act.id, { points: Number(e.target.value) })}
-                    style={{ width: '4rem' }}
+                    onChange={(e) => updateActivity(act.id, { points: clampPoints(Number(e.target.value)) })}
+                    style={{ width: '4.5rem' }}
+                    aria-label={`${act.name} points per hour`}
                   />
+                  pts/h
                 </label>
                 <button type="button" className="btn btn-ghost" onClick={() => reorderActivity(cat.id, act.id, 'up')}>
                   ↑
@@ -154,7 +174,9 @@ export function ActivitiesPage() {
               style={{ marginTop: '0.5rem' }}
               onClick={() => {
                 const name = prompt('Activity name');
-                if (name?.trim()) addActivity(cat.id, name.trim());
+                if (!name?.trim()) return;
+                const raw = prompt('Points per hour (-100 to 100, negative = loses points)', '0');
+                addActivity(cat.id, name.trim(), clampPoints(Number(raw) || 0));
               }}
             >
               + Add activity

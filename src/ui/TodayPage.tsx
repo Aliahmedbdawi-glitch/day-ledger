@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useStore, useSortedCatalog } from '../data/store';
-import { addDays, formatDisplayDate, todayKey } from '../domain/dates';
+import { addDays, formatDisplayDate, formatDurationMinutes, todayKey } from '../domain/dates';
 import {
   findLog,
   generateDaySlots,
@@ -8,18 +8,39 @@ import {
   getIntervalForDate,
   getUnrecordedSlots,
 } from '../domain/grid';
-import { computeDayStats } from '../domain/scoring';
+import { computeDayStats, formatPoints } from '../domain/scoring';
+import { computeTargetProgress } from '../domain/targets';
+import { isSlotInSleepWindow, minutesToTime, sleepWindow } from '../domain/sleep';
 import type { TimeSlot } from '../domain/types';
-import { useIntervalNotifications } from '../hooks/useIntervalNotifications';
 import { RecordSheet } from './RecordSheet';
 import { SleepQuickAddSheet } from './SleepQuickAddSheet';
+import { DayPulse } from './DayPulse';
+import { Icon } from './Icon';
+import { BACK_EVENT } from './backEvent';
 
-export function TodayPage() {
+function pointsClass(value: number): string {
+  if (Math.round(value) > 0) return 'pts-pos';
+  if (Math.round(value) < 0) return 'pts-neg';
+  return 'muted';
+}
+
+/** A slot to open on mount, e.g. from clicking a desktop notification. */
+export interface OpenSlotRequest {
+  date: string;
+  startTime: string;
+}
+
+export function TodayPage({ openSlot }: { openSlot?: OpenSlotRequest }) {
   const { data, saveIntervalLog, saveSleepForSlots, updateSettings } = useStore();
   const { categories, activities } = useSortedCatalog(data);
-  const [viewDate, setViewDate] = useState(todayKey());
-  const [activeSlot, setActiveSlot] = useState<TimeSlot | null>(null);
-  const [catchUpDismissed, setCatchUpDismissed] = useState(false);
+  const { settings } = data;
+  const [viewDate, setViewDate] = useState(() => openSlot?.date ?? todayKey());
+  const [activeSlot, setActiveSlot] = useState<TimeSlot | null>(() => {
+    if (!openSlot) return null;
+    const daySlots = generateDaySlots(openSlot.date, getIntervalForDate(data, openSlot.date));
+    return daySlots.find((s) => s.startTime === openSlot.startTime) ?? null;
+  });
+  const [dismissedForSlot, setDismissedForSlot] = useState<string | null>(null);
   const [sleepOpen, setSleepOpen] = useState(false);
   const nowRef = useRef(new Date());
   const [, tick] = useState(0);
@@ -40,12 +61,33 @@ export function TodayPage() {
   const now = nowRef.current;
   const isToday = viewDate === todayKey();
   const currentSlot = isToday ? getCurrentSlot(slots, now) : undefined;
-  const dayStats = computeDayStats(data, viewDate);
+  const dayStats = computeDayStats(data, viewDate, now);
+  const targetProgress = computeTargetProgress(data, viewDate, now);
+  const targetsMet = targetProgress.filter((p) => p.met).length;
+  const sleepWin = sleepWindow(settings);
 
-  const unrecorded = isToday ? getUnrecordedSlots(slots, data.logs, now) : [];
+  // Sleep-window slots are filled automatically at wake-up, so don't nag about them.
+  const unrecorded = isToday
+    ? getUnrecordedSlots(slots, data.logs, now).filter(
+        (s) => !(settings.autoRegisterSleep && isSlotInSleepWindow(s, sleepWin)),
+      )
+    : [];
 
-  const refreshCatchUp = useCallback(() => setCatchUpDismissed(false), []);
-  useIntervalNotifications(data, refreshCatchUp);
+  // Dismissal lasts for the current interval only; the next one brings the banner back.
+  const catchUpDismissed = dismissedForSlot !== null && dismissedForSlot === currentSlot?.startTime;
+
+  // Android back button closes an open panel before leaving the page.
+  useEffect(() => {
+    const onBack = (e: Event) => {
+      if (activeSlot || sleepOpen) {
+        e.preventDefault();
+        setActiveSlot(null);
+        setSleepOpen(false);
+      }
+    };
+    window.addEventListener(BACK_EVENT, onBack);
+    return () => window.removeEventListener(BACK_EVENT, onBack);
+  }, [activeSlot, sleepOpen]);
 
   const currentRowRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -69,19 +111,24 @@ export function TodayPage() {
     if (log.activityIds.length === 0) {
       return <span className="muted">Recorded (no activities)</span>;
     }
-    return log.activityIds.map((id) => {
-      const act = activityById.get(id);
-      const cat = act ? categoryById.get(act.categoryId) : undefined;
-      return (
-        <span
-          key={id}
-          className="activity-pill"
-          style={{ '--pill-color': cat?.color } as CSSProperties}
-        >
-          {cat?.icon} {act?.name}
-        </span>
-      );
-    });
+    return (
+      <>
+        {log.activityIds.map((id) => {
+          const act = activityById.get(id);
+          const cat = act ? categoryById.get(act.categoryId) : undefined;
+          return (
+            <span
+              key={id}
+              className="activity-pill"
+              style={{ '--pill-color': cat?.color } as CSSProperties}
+            >
+              {cat?.icon} {act?.name}
+            </span>
+          );
+        })}
+        {log.source === 'auto' && <span className="auto-badge">auto</span>}
+      </>
+    );
   };
 
   const openCatchUp = () => {
@@ -91,58 +138,80 @@ export function TodayPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1 className="page-title">Timeline</h1>
+        <div>
+          <div className="eyebrow">Timeline</div>
+          <h1 className="page-title">{formatDisplayDate(viewDate)}</h1>
+        </div>
         <div className="date-nav">
           <button
             type="button"
-            className="btn"
+            className="btn btn-icon"
             onClick={() => setViewDate((d) => addDays(d, -1))}
             aria-label="Previous day"
           >
-            ←
+            <Icon name="left" />
           </button>
-          <h2>{formatDisplayDate(viewDate)}</h2>
           <button
             type="button"
             className="btn"
-            onClick={() => setViewDate((d) => addDays(d, 1))}
-            aria-label="Next day"
+            disabled={viewDate === todayKey()}
+            onClick={() => setViewDate(todayKey())}
           >
-            →
-          </button>
-          {viewDate !== todayKey() && (
-            <button type="button" className="btn btn-ghost" onClick={() => setViewDate(todayKey())}>
-              Jump to today
-            </button>
-          )}
-          <button type="button" className="btn" onClick={() => setSleepOpen(true)}>
-            😴 Add sleep
-          </button>
-        </div>
-      </div>
-
-      {isToday && unrecorded.length > 0 && !catchUpDismissed && (
-        <div className="catch-up">
-          <strong>You have {unrecorded.length} unrecorded interval{unrecorded.length > 1 ? 's' : ''}.</strong>
-          <ul>
-            {unrecorded.slice(0, 5).map((s) => (
-              <li key={s.startTime} className="mono">
-                {s.startTime} – {s.endTime}
-              </li>
-            ))}
-            {unrecorded.length > 5 && <li className="muted">…and {unrecorded.length - 5} more</li>}
-          </ul>
-          <button type="button" className="btn btn-primary" onClick={openCatchUp}>
-            Record now
+            Today
           </button>
           <button
             type="button"
-            className="btn btn-ghost"
-            style={{ marginLeft: '0.5rem' }}
-            onClick={() => setCatchUpDismissed(true)}
+            className="btn btn-icon"
+            onClick={() => setViewDate((d) => addDays(d, 1))}
+            aria-label="Next day"
           >
-            Dismiss
+            <Icon name="right" />
           </button>
+          <button type="button" className="btn" onClick={() => setSleepOpen(true)}>
+            <Icon name="bed" size={16} />
+            Add sleep
+          </button>
+          {isToday && currentSlot && (
+            <button type="button" className="btn btn-primary hide-mobile" onClick={() => setActiveSlot(currentSlot)}>
+              Log {currentSlot.startTime}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <DayPulse
+        stats={dayStats}
+        slots={slots}
+        intervalMinutes={interval}
+        sleepWin={sleepWin}
+        currentStart={currentSlot?.startTime}
+        goal={settings.dailyPointsGoal}
+      />
+
+      {isToday && unrecorded.length > 0 && !catchUpDismissed && (
+        <div className="catch-up" role="status">
+          <div className="catch-up-text">
+            <strong>
+              {unrecorded.length} unrecorded interval{unrecorded.length > 1 ? 's' : ''}
+            </strong>
+            <span className="muted">
+              Earliest <span className="mono">{unrecorded[0].startTime}–{unrecorded[0].endTime}</span>
+              {settings.unrecordedPenaltyPerHour > 0 &&
+                ` · costing ${formatPoints(-(unrecorded.length * interval * settings.unrecordedPenaltyPerHour) / 60)} pts`}
+            </span>
+          </div>
+          <div className="catch-up-actions">
+            <button type="button" className="btn btn-primary" onClick={openCatchUp}>
+              Record now
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setDismissedForSlot(currentSlot?.startTime ?? null)}
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
 
@@ -151,10 +220,13 @@ export function TodayPage() {
           {slots.map((slot) => {
             const isCurrent = currentSlot?.startTime === slot.startTime;
             const recorded = findLog(data.logs, slot) !== undefined;
+            const inSleep = isSlotInSleepWindow(slot, sleepWin);
+            const pts = dayStats.slotPoints[slot.startTime];
             const rowClass = [
               'strip-row',
               isCurrent ? 'is-current' : '',
               !recorded ? 'is-unrecorded' : '',
+              inSleep ? 'is-sleep-window' : '',
             ]
               .filter(Boolean)
               .join(' ');
@@ -167,8 +239,15 @@ export function TodayPage() {
                 role="listitem"
               >
                 <button type="button" onClick={() => setActiveSlot(slot)}>
-                  <span className="strip-time mono">{slot.startTime}</span>
-                  <span className="strip-body">{renderSlotLabel(slot)}</span>
+                  <span className="strip-time mono">
+                    {slot.startTime}
+                  </span>
+                  <span className="strip-body">
+                    {renderSlotLabel(slot)}
+                    {pts !== undefined && Math.round(pts) !== 0 && (
+                      <span className={`slot-points mono ${pointsClass(pts)}`}>{formatPoints(pts)}</span>
+                    )}
+                  </span>
                 </button>
               </div>
             );
@@ -176,29 +255,60 @@ export function TodayPage() {
         </div>
 
         <aside className="summary-panel card">
-          <div className="score-block">
-            <div className="score-value">
-              {dayStats.score !== null ? dayStats.score : '—'}
-              <span className="muted" style={{ fontSize: '1rem', fontWeight: 400 }}> / 100</span>
+          <div>
+            <div className="eyebrow">Day ledger</div>
+            <ul className="ledger-list">
+              <li>
+                <span>Gained</span>
+                <span className="mono pts-pos">{formatPoints(dayStats.gainedPoints)}</span>
+              </li>
+              <li>
+                <span>Lost</span>
+                <span className="mono pts-neg">{formatPoints(dayStats.lostPoints)}</span>
+              </li>
+              <li>
+                <span>
+                  Sleep {formatDurationMinutes(Math.round(dayStats.sleepMinutes))}
+                  <span className="muted"> / {settings.sleepLimitHours}h limit</span>
+                </span>
+                {dayStats.oversleepMinutes > 0 ? (
+                  <span className="mono pts-neg">{formatPoints(dayStats.oversleepPenalty)}</span>
+                ) : (
+                  <span className="muted">ok</span>
+                )}
+              </li>
+              <li>
+                <span>Unrecorded {formatDurationMinutes(dayStats.unrecordedMinutes)}</span>
+                <span className={`mono ${pointsClass(dayStats.unrecordedPenalty)}`}>
+                  {formatPoints(dayStats.unrecordedPenalty)}
+                </span>
+              </li>
+              {targetProgress.length > 0 && (
+                <li>
+                  <span>Targets met</span>
+                  <span className={`mono ${targetsMet === targetProgress.length ? 'pts-pos' : ''}`}>
+                    {targetsMet}/{targetProgress.length}
+                  </span>
+                </li>
+              )}
+            </ul>
+
+            <div style={{ marginTop: '1rem' }}>
+              <div className="muted" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Tracked of elapsed time</span>
+                <strong className="mono" style={{ color: 'var(--ink)' }}>{dayStats.trackedPercent}%</strong>
+              </div>
+              <div className="progress-bar" aria-hidden="true">
+                <span style={{ width: `${dayStats.trackedPercent}%` }} />
+              </div>
             </div>
-            <div className="score-label">Productivity score</div>
-            <div className="progress-bar" aria-hidden="true">
-              <span style={{ width: `${dayStats.score ?? 0}%` }} />
-            </div>
-            <p className="muted" style={{ marginTop: '1rem' }}>
-              Tracked: <strong>{dayStats.trackedPercent}%</strong>
+            <p className="muted" style={{ margin: '1rem 0 0' }}>
+              Sleep window{' '}
+              <span className="mono" style={{ color: 'var(--night)' }}>
+                {minutesToTime(sleepWin.bedMin)}–{minutesToTime(sleepWin.wakeMin)}
+              </span>
+              {settings.autoRegisterSleep ? ' · auto-registered' : ''}
             </p>
-            <p className="muted" style={{ margin: '0.25rem 0 0' }}>
-              {dayStats.loggedCount} of {dayStats.totalSlots} intervals
-            </p>
-            <button
-              type="button"
-              className="btn"
-              style={{ marginTop: '1rem', width: '100%' }}
-              onClick={() => setSleepOpen(true)}
-            >
-              😴 Add sleep
-            </button>
           </div>
         </aside>
       </div>
@@ -209,7 +319,7 @@ export function TodayPage() {
           className="btn btn-primary mobile-log-fab"
           onClick={() => setActiveSlot(currentSlot)}
         >
-          Log current interval
+          Log now
         </button>
       )}
 
@@ -220,8 +330,8 @@ export function TodayPage() {
           activities={activities}
           intervalMinutes={interval}
           sleepDefaults={{
-            durationHours: data.settings.defaultSleepDurationHours,
-            endTime: data.settings.defaultSleepEndTime,
+            durationHours: settings.defaultSleepDurationHours,
+            endTime: settings.defaultSleepEndTime,
           }}
           onClose={() => setSleepOpen(false)}
           onSave={(picked) => saveSleepForSlots(picked)}
@@ -241,6 +351,7 @@ export function TodayPage() {
           activities={activities}
           logs={data.logs}
           allSlots={slots}
+          targetProgress={targetProgress}
           onClose={() => setActiveSlot(null)}
           onSave={(ids) => saveIntervalLog(activeSlot, ids)}
         />

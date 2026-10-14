@@ -35,10 +35,10 @@ export function createExampleSeed(): Pick<AppData, 'categories' | 'activities'> 
     { id: id(), categoryId: healthId, name: 'Gym', points: 80, sortOrder: 0 },
     { id: id(), categoryId: healthId, name: 'Running', points: 80, sortOrder: 1 },
     { id: id(), categoryId: healthId, name: 'Walking', points: 70, sortOrder: 2 },
-    { id: id(), categoryId: healthId, name: 'Sleep', points: 40, sortOrder: 3 },
-    { id: id(), categoryId: entertainmentId, name: 'YouTube', points: 20, sortOrder: 0 },
-    { id: id(), categoryId: entertainmentId, name: 'Gaming', points: 15, sortOrder: 1 },
-    { id: id(), categoryId: entertainmentId, name: 'Social Media', points: 5, sortOrder: 2 },
+    { id: id(), categoryId: healthId, name: 'Sleep', points: 10, sortOrder: 3 },
+    { id: id(), categoryId: entertainmentId, name: 'YouTube', points: -20, sortOrder: 0 },
+    { id: id(), categoryId: entertainmentId, name: 'Gaming', points: -30, sortOrder: 1 },
+    { id: id(), categoryId: entertainmentId, name: 'Social Media', points: -50, sortOrder: 2 },
   ];
 
   return { categories, activities };

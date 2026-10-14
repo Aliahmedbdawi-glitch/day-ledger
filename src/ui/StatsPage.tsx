@@ -5,6 +5,7 @@ import {
   computeDayStats,
   computeWeekStats,
   sortedActivityBreakdown,
+  formatPoints,
   sortedCategoryBreakdown,
 } from '../domain/scoring';
 
@@ -59,16 +60,21 @@ export function StatsPage() {
       {tab === 'daily' ? (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <p style={{ margin: '0 0 0.5rem' }}>
-            Score: <strong>{day.score ?? '—'}</strong> / 100 · Tracked: <strong>{day.trackedPercent}%</strong>
+            Net: <strong>{day.netPoints === null ? '—' : formatPoints(day.netPoints)}</strong> pts
+            {day.goalPercent !== null && <span className="muted"> ({day.goalPercent}% of goal)</span>}
+            {' · '}Tracked: <strong>{day.trackedPercent}%</strong>
           </p>
           <p className="muted" style={{ margin: 0 }}>
-            Unrecorded: {formatDurationMinutes(day.unrecordedMinutes)}
+            Gained <span className="pts-pos">{formatPoints(day.gainedPoints)}</span> · Lost{' '}
+            <span className="pts-neg">{formatPoints(day.lostPoints)}</span> · Unrecorded:{' '}
+            {formatDurationMinutes(day.unrecordedMinutes)}
           </p>
         </div>
       ) : (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <p style={{ margin: '0 0 0.5rem' }}>
-            Average score: <strong>{week.averageScore ?? '—'}</strong> · Tracked:{' '}
+            Average net: <strong>{week.averageNetPoints === null ? '—' : formatPoints(week.averageNetPoints)}</strong>
+            {' '}/ day · Week total: <strong>{formatPoints(week.totalNetPoints)}</strong> · Tracked:{' '}
             <strong>{week.averageTrackedPercent}%</strong>
           </p>
           <p className="muted" style={{ margin: '0 0 0.5rem' }}>
@@ -80,14 +86,11 @@ export function StatsPage() {
               {week.weakestDay ? formatDisplayDate(week.weakestDay) : '—'}
             </p>
           )}
-          {prevWeek.averageScore !== null && week.averageScore !== null && (
+          {prevWeek.averageNetPoints !== null && week.averageNetPoints !== null && (
             <p style={{ marginTop: '0.75rem' }}>
               vs previous week:{' '}
-              <strong>
-                {week.averageScore - prevWeek.averageScore >= 0 ? '+' : ''}
-                {week.averageScore - prevWeek.averageScore}
-              </strong>{' '}
-              points
+              <strong>{formatPoints(week.averageNetPoints - prevWeek.averageNetPoints)}</strong>{' '}
+              points / day
             </p>
           )}
         </div>
