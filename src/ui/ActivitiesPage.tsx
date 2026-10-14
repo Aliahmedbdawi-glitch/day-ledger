@@ -132,39 +132,41 @@ export function ActivitiesPage() {
             {acts.map((act) => (
               <div key={act.id} className="activity-line">
                 <input
+                  className="activity-name"
                   value={act.name}
+                  aria-label={`${act.name} name`}
                   onChange={(e) => updateActivity(act.id, { name: e.target.value })}
-                  style={{ flex: 1, border: 'none', background: 'transparent' }}
                 />
-                <button
-                  type="button"
-                  className={`btn sign-toggle ${act.points < 0 ? 'is-neg' : 'is-pos'}`}
-                  title="Flip between gaining and losing points"
-                  onClick={() => updateActivity(act.id, { points: -act.points })}
-                >
-                  {act.points < 0 ? '−' : '+'}
-                </button>
-                <label className="muted" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <input
-                    type="number"
-                    min={-100}
-                    max={100}
-                    value={act.points}
-                    onChange={(e) => updateActivity(act.id, { points: clampPoints(Number(e.target.value)) })}
-                    style={{ width: '4.5rem' }}
-                    aria-label={`${act.name} points per hour`}
-                  />
-                  pts/h
-                </label>
-                <button type="button" className="btn btn-ghost" onClick={() => reorderActivity(cat.id, act.id, 'up')}>
-                  ↑
-                </button>
-                <button type="button" className="btn btn-ghost" onClick={() => reorderActivity(cat.id, act.id, 'down')}>
-                  ↓
-                </button>
-                <button type="button" className="btn btn-danger" onClick={() => deleteActivity(act.id)}>
-                  Remove
-                </button>
+                <div className="activity-controls">
+                  <button
+                    type="button"
+                    className={`btn sign-toggle ${act.points < 0 ? 'is-neg' : 'is-pos'}`}
+                    title="Flip between gaining and losing points"
+                    onClick={() => updateActivity(act.id, { points: -act.points })}
+                  >
+                    {act.points < 0 ? '−' : '+'}
+                  </button>
+                  <label className="muted activity-points">
+                    <input
+                      type="number"
+                      min={-100}
+                      max={100}
+                      value={act.points}
+                      onChange={(e) => updateActivity(act.id, { points: clampPoints(Number(e.target.value)) })}
+                      aria-label={`${act.name} points per hour`}
+                    />
+                    pts/h
+                  </label>
+                  <button type="button" className="btn btn-ghost" onClick={() => reorderActivity(cat.id, act.id, 'up')}>
+                    ↑
+                  </button>
+                  <button type="button" className="btn btn-ghost" onClick={() => reorderActivity(cat.id, act.id, 'down')}>
+                    ↓
+                  </button>
+                  <button type="button" className="btn btn-danger" onClick={() => deleteActivity(act.id)}>
+                    Remove
+                  </button>
+                </div>
               </div>
             ))}
 

@@ -878,15 +878,27 @@ input[type='color'] {
 
 .category-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
   margin-bottom: 0.75rem;
 }
 
+.category-head > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
 .category-head input {
-  min-height: 0;
-  padding: 0.15rem 0.3rem;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.5rem;
   font-family: var(--font-display);
   font-size: var(--text-lg) !important;
   letter-spacing: -0.02em;
@@ -894,15 +906,34 @@ input[type='color'] {
 
 .activity-line {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  padding: 0.65rem 0;
   border-top: 1px solid var(--line);
 }
 
-.activity-line > input:first-child {
+.activity-name {
+  width: 100%;
   min-width: 0;
   font-weight: 500;
+}
+
+.activity-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.activity-points {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.activity-points input {
+  width: 4.5rem;
 }
 
 .sign-toggle {
@@ -1146,9 +1177,8 @@ input[type='color'] {
 .act-tile-name {
   font-weight: 600;
   font-size: var(--text-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .act-tile .act-points {
