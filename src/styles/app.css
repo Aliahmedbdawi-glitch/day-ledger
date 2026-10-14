@@ -968,6 +968,16 @@ input[type='color'] {
   max-width: 62ch;
 }
 
+.install-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.install-actions .btn {
+  text-decoration: none;
+}
+
 .record-list {
   list-style: none;
   padding: 0.25rem 1.375rem;

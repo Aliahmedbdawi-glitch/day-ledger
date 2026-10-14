@@ -12,6 +12,9 @@ import {
   requestNotificationPermission,
 } from '../platform/android';
 
+const ANDROID_APK =
+  'https://github.com/Aliahmedbdawi-glitch/day-ledger/releases/download/android-latest/DayLedger.apk';
+
 function AndroidRemindersCard() {
   const [permission, setPermission] = useState<'granted' | 'denied' | 'prompt' | null>(null);
   const [exact, setExact] = useState<boolean | null>(null);
@@ -137,6 +140,20 @@ export function SettingsPage() {
       <div className="page-header">
         <h1 className="page-title">Settings</h1>
       </div>
+
+      {!isAndroid && (
+        <div className="card settings-group">
+          <h3>Install</h3>
+          <p className="muted">
+            Install Day Ledger on your Android phone. Installing again updates the copy you already have.
+          </p>
+          <div className="install-actions">
+            <a className="btn btn-primary" href={ANDROID_APK} download>
+              Download Android app
+            </a>
+          </div>
+        </div>
+      )}
 
       <div className="card settings-group">
         <h3>Time interval</h3>
