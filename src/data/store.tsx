@@ -18,6 +18,7 @@ import type {
   TimeSlot,
 } from '../domain/types';
 import { addDays, todayKey } from '../domain/dates';
+import { withHabitAdded, withHabitToggled } from '../domain/habits';
 import { applyAutoSleep, ensureSleepActivity, findSleepActivity } from '../domain/sleep';
 import { createExampleSeed } from './seed';
 import { loadData, saveData } from './storage';
@@ -41,6 +42,9 @@ interface StoreValue {
   addTarget: (target: Omit<DailyTarget, 'id'>) => void;
   updateTarget: (id: string, patch: Partial<DailyTarget>) => void;
   deleteTarget: (id: string) => void;
+  addHabit: (activityId: string, startTime: string) => void;
+  removeHabit: (id: string) => void;
+  toggleHabit: (slot: TimeSlot, activityId: string) => void;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -210,6 +214,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const act = prev.activities.find((a) => a.id === t.activityId);
         return act?.categoryId !== id;
       }),
+      habits: prev.habits.filter((h) => {
+        const act = prev.activities.find((a) => a.id === h.activityId);
+        return act?.categoryId !== id;
+      }),
       logs: prev.logs.map((l) => ({
         ...l,
         activityIds: l.activityIds.filter((aid) => {
@@ -272,6 +280,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         activityIds: l.activityIds.filter((aid) => aid !== id),
       })),
       targets: prev.targets.filter((t) => t.activityId !== id),
+      habits: prev.habits.filter((h) => h.activityId !== id),
     }));
   }, [persist]);
 
@@ -291,6 +300,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const deleteTarget = useCallback((id: string) => {
     persist((prev) => ({ ...prev, targets: prev.targets.filter((t) => t.id !== id) }));
+  }, [persist]);
+
+  const addHabit = useCallback((activityId: string, startTime: string) => {
+    persist((prev) => ({
+      ...prev,
+      habits: withHabitAdded(prev.habits, {
+        id: crypto.randomUUID(),
+        activityId,
+        startTime,
+      }),
+    }));
+  }, [persist]);
+
+  const removeHabit = useCallback((id: string) => {
+    persist((prev) => ({
+      ...prev,
+      habits: prev.habits.filter((h) => h.id !== id),
+    }));
+  }, [persist]);
+
+  const toggleHabit = useCallback((slot: TimeSlot, activityId: string) => {
+    persist((prev) => ({
+      ...prev,
+      logs: withHabitToggled(prev.logs, slot, activityId, new Date().toISOString()),
+    }));
   }, [persist]);
 
   const reorderActivity = useCallback(
@@ -334,6 +368,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       addTarget,
       updateTarget,
       deleteTarget,
+      addHabit,
+      removeHabit,
+      toggleHabit,
     }),
     [
       data,
@@ -354,6 +391,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       addTarget,
       updateTarget,
       deleteTarget,
+      addHabit,
+      removeHabit,
+      toggleHabit,
     ],
   );
 

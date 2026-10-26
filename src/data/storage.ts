@@ -1,4 +1,5 @@
 import type { AppData, Settings } from '../domain/types';
+import { readTaskLayout } from '../domain/habits';
 import { todayKey } from '../domain/dates';
 
 const STORAGE_KEY = 'day-ledger-v1';
@@ -18,6 +19,7 @@ export function defaultSettings(): Settings {
     quietDuringSleep: true,
     unrecordedPenaltyPerHour: 10,
     dailyPointsGoal: 400,
+    taskLayout: 'cards',
   };
 }
 
@@ -30,6 +32,7 @@ export function createEmptyData(): AppData {
     settings: defaultSettings(),
     dayIntervalMinutes: {},
     targets: [],
+    habits: [],
   };
 }
 
@@ -39,10 +42,16 @@ export function loadData(): AppData {
     if (!raw) return createEmptyData();
     const parsed = JSON.parse(raw) as AppData;
     if (parsed.version !== 1) return createEmptyData();
+    const taskLayout = parsed.settings?.taskLayout;
     return {
       ...createEmptyData(),
       ...parsed,
-      settings: { ...defaultSettings(), ...parsed.settings },
+      settings: {
+        ...defaultSettings(),
+        ...parsed.settings,
+        taskLayout: readTaskLayout(taskLayout),
+      },
+      habits: Array.isArray(parsed.habits) ? parsed.habits : [],
     };
   } catch {
     return createEmptyData();

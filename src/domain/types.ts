@@ -52,6 +52,19 @@ export interface Settings {
   unrecordedPenaltyPerHour: number;
   /** Net points a day needs to count as productive. */
   dailyPointsGoal: number;
+  /** Which task-box layout the timeline uses. */
+  taskLayout: TaskLayout;
+}
+
+/** How daily task boxes sit on the timeline. */
+export type TaskLayout = 'strip' | 'cards' | 'rail';
+
+/** An activity pinned to a clock time, shown every day in the interval that contains it. */
+export interface DailyHabit {
+  id: string;
+  activityId: string;
+  /** Clock time this task is pinned to (HH:mm). */
+  startTime: string;
 }
 
 export interface AppData {
@@ -62,6 +75,7 @@ export interface AppData {
   settings: Settings;
   dayIntervalMinutes: Record<string, IntervalMinutes>;
   targets: DailyTarget[];
+  habits: DailyHabit[];
 }
 
 /** 'atLeast' = a goal to reach (e.g. 2h Medicine); 'atMost' = a cap (e.g. 30m Social Media). */

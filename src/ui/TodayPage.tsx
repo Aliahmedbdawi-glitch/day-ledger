@@ -11,12 +11,14 @@ import {
 import { computeDayStats, formatPoints } from '../domain/scoring';
 import { computeTargetProgress } from '../domain/targets';
 import { isSlotInSleepWindow, minutesToTime, sleepWindow } from '../domain/sleep';
+import { habitsInSlot } from '../domain/habits';
 import type { TimeSlot } from '../domain/types';
 import { RecordSheet } from './RecordSheet';
 import { SleepQuickAddSheet } from './SleepQuickAddSheet';
 import { DayPulse } from './DayPulse';
 import { Icon } from './Icon';
 import { BACK_EVENT } from './backEvent';
+import { SlotTasks, TaskPicker, type SlotTaskItem } from './TaskLane';
 
 function pointsClass(value: number): string {
   if (Math.round(value) > 0) return 'pts-pos';
@@ -31,7 +33,7 @@ export interface OpenSlotRequest {
 }
 
 export function TodayPage({ openSlot }: { openSlot?: OpenSlotRequest }) {
-  const { data, saveIntervalLog, saveSleepForSlots, updateSettings } = useStore();
+  const { data, saveIntervalLog, saveSleepForSlots, updateSettings, addHabit, removeHabit, toggleHabit } = useStore();
   const { categories, activities } = useSortedCatalog(data);
   const { settings } = data;
   const [viewDate, setViewDate] = useState(() => openSlot?.date ?? todayKey());
@@ -42,6 +44,7 @@ export function TodayPage({ openSlot }: { openSlot?: OpenSlotRequest }) {
   });
   const [dismissedForSlot, setDismissedForSlot] = useState<string | null>(null);
   const [sleepOpen, setSleepOpen] = useState(false);
+  const [pickerSlot, setPickerSlot] = useState<TimeSlot | null>(null);
   const nowRef = useRef(new Date());
   const [, tick] = useState(0);
 
@@ -79,15 +82,18 @@ export function TodayPage({ openSlot }: { openSlot?: OpenSlotRequest }) {
   // Android back button closes an open panel before leaving the page.
   useEffect(() => {
     const onBack = (e: Event) => {
-      if (activeSlot || sleepOpen) {
+      if (pickerSlot || activeSlot || sleepOpen) {
         e.preventDefault();
-        setActiveSlot(null);
-        setSleepOpen(false);
+        if (pickerSlot) setPickerSlot(null);
+        else {
+          setActiveSlot(null);
+          setSleepOpen(false);
+        }
       }
     };
     window.addEventListener(BACK_EVENT, onBack);
     return () => window.removeEventListener(BACK_EVENT, onBack);
-  }, [activeSlot, sleepOpen]);
+  }, [activeSlot, sleepOpen, pickerSlot]);
 
   const currentRowRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -216,17 +222,31 @@ export function TodayPage({ openSlot }: { openSlot?: OpenSlotRequest }) {
       )}
 
       <div className="today-layout">
-        <div className="day-strip" role="list" aria-label="Day timeline">
+        <div className="day-strip layout-rail" role="list" aria-label="Day timeline">
           {slots.map((slot) => {
             const isCurrent = currentSlot?.startTime === slot.startTime;
             const recorded = findLog(data.logs, slot) !== undefined;
             const inSleep = isSlotInSleepWindow(slot, sleepWin);
             const pts = dayStats.slotPoints[slot.startTime];
+            const log = findLog(data.logs, slot);
+            const tasks: SlotTaskItem[] = habitsInSlot(data.habits, slot).map((habit) => {
+              const act = activityById.get(habit.activityId);
+              const cat = act ? categoryById.get(act.categoryId) : undefined;
+              return {
+                id: habit.id,
+                activityId: habit.activityId,
+                name: act?.name ?? 'Removed activity',
+                color: cat?.color,
+                done: log?.activityIds.includes(habit.activityId) ?? false,
+                canToggle: Boolean(act),
+              };
+            });
             const rowClass = [
               'strip-row',
               isCurrent ? 'is-current' : '',
               !recorded ? 'is-unrecorded' : '',
               inSleep ? 'is-sleep-window' : '',
+              tasks.length > 0 ? 'has-tasks' : '',
             ]
               .filter(Boolean)
               .join(' ');
@@ -238,10 +258,8 @@ export function TodayPage({ openSlot }: { openSlot?: OpenSlotRequest }) {
                 ref={isCurrent ? currentRowRef : undefined}
                 role="listitem"
               >
-                <button type="button" onClick={() => setActiveSlot(slot)}>
-                  <span className="strip-time mono">
-                    {slot.startTime}
-                  </span>
+                <span className="strip-time mono">{slot.startTime}</span>
+                <button type="button" className="strip-hit" onClick={() => setActiveSlot(slot)}>
                   <span className="strip-body">
                     {renderSlotLabel(slot)}
                     {pts !== undefined && Math.round(pts) !== 0 && (
@@ -249,6 +267,16 @@ export function TodayPage({ openSlot }: { openSlot?: OpenSlotRequest }) {
                     )}
                   </span>
                 </button>
+                <SlotTasks
+                  tasks={tasks}
+                  onToggle={(activityId) => toggleHabit(slot, activityId)}
+                  onRemove={(habitId, name) => {
+                    if (confirm(`Stop showing “${name}” every day at ${slot.startTime}?`)) {
+                      removeHabit(habitId);
+                    }
+                  }}
+                  onAdd={() => setPickerSlot(slot)}
+                />
               </div>
             );
           })}
@@ -341,6 +369,20 @@ export function TodayPage({ openSlot }: { openSlot?: OpenSlotRequest }) {
               defaultSleepEndTime: d.endTime,
             })
           }
+        />
+      )}
+
+      {pickerSlot && (
+        <TaskPicker
+          slot={pickerSlot}
+          categories={categories}
+          activities={activities}
+          pinnedActivityIds={habitsInSlot(data.habits, pickerSlot).map((h) => h.activityId)}
+          onClose={() => setPickerSlot(null)}
+          onPick={(activityId) => {
+            addHabit(activityId, pickerSlot.startTime);
+            setPickerSlot(null);
+          }}
         />
       )}
 

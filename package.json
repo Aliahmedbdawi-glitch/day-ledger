@@ -4,7 +4,7 @@
   "description": "Track your day in intervals, earn and lose points, hit your daily targets.",
   "author": "Day Ledger",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
