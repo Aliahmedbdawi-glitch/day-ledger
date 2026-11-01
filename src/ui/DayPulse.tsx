@@ -4,6 +4,7 @@ import type { SleepWindow } from '../domain/sleep';
 import { isSlotInSleepWindow } from '../domain/sleep';
 import type { TimeSlot } from '../domain/types';
 import { Icon } from './Icon';
+import { parseTimeToMinutes } from '../domain/dates';
 
 interface Props {
   stats: DayStats;
@@ -26,7 +27,6 @@ export function DayPulse({ stats, slots, intervalMinutes, sleepWin, currentStart
   const net = stats.netPoints;
   const ringPct = Math.max(0, Math.min(100, stats.goalPercent ?? 0));
   // A full-strength (±100 pts/h) slot fills the bar height, so bars stay comparable across days.
-  const slotMax = Math.max(1, (100 * intervalMinutes) / 60);
   const w = 10;
   const gap = slots.length > 48 ? 1 : 2;
   const width = slots.length * w;
@@ -90,6 +90,8 @@ export function DayPulse({ stats, slots, intervalMinutes, sleepWin, currentStart
             vectorEffect="non-scaling-stroke"
           />
           {slots.map((slot, i) => {
+            const duration = parseTimeToMinutes(slot.endTime) - parseTimeToMinutes(slot.startTime);
+            const slotMax = Math.max(1, (100 * (duration || intervalMinutes)) / 60);
             const pts = stats.slotPoints[slot.startTime];
             if (pts === undefined || Math.round(pts) === 0) return null;
             const ratio = Math.min(1, Math.abs(pts) / slotMax);

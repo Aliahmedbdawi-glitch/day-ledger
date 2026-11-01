@@ -37,7 +37,7 @@ export function planReminders(
   const today = formatDateKey(now);
 
   for (const date of [today, addDays(today, 1)]) {
-    for (const slot of generateDaySlots(date, getIntervalForDate(data, date))) {
+    for (const slot of generateDaySlots(date, getIntervalForDate(data, date), data.logs)) {
       const at = parseDateKey(date);
       at.setMinutes(parseTimeToMinutes(slot.endTime));
       const t = at.getTime();

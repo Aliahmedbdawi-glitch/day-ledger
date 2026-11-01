@@ -115,7 +115,7 @@ export function applyAutoSleep(data: AppData, now: Date): AppData {
   for (; date <= today; date = addDays(date, 1)) {
     const interval = getIntervalForDate(data, date);
     let added = false;
-    for (const slot of generateDaySlots(date, interval)) {
+    for (const slot of generateDaySlots(date, interval, data.logs)) {
       if (!isSlotInSleepWindow(slot, w)) continue;
       if (recorded.has(logKey(slot.date, slot.startTime))) continue;
       if (sleepWindowEndsAt(slot, w) > now) continue;
@@ -171,13 +171,14 @@ export function findEndSlotIndexByEndTime(slots: TimeSlot[], endTime: string): n
 
 export function selectionFromSleepDefaults(
   slots: TimeSlot[],
-  intervalMinutes: number,
+  _intervalMinutes: number,
   durationHours: number,
   endTime: string,
 ): { endIndex: number; selectedStartTimes: Set<string> } {
   const endIndex = findEndSlotIndexByEndTime(slots, endTime);
-  const count = Math.max(1, slotCountForHours(durationHours, intervalMinutes));
-  const start = Math.max(0, endIndex - count + 1);
+  const startMinute = parseTimeToMinutes(slots[endIndex]?.endTime ?? endTime) - durationHours * 60;
+  let start = endIndex;
+  while (start > 0 && parseTimeToMinutes(slots[start].startTime) > startMinute) start -= 1;
   const picked = slotsBetweenInclusive(slots, start, endIndex);
   return {
     endIndex,
@@ -187,7 +188,7 @@ export function selectionFromSleepDefaults(
 
 export function sleepDefaultsFromSelection(
   selectedSlots: TimeSlot[],
-  intervalMinutes: number,
+  _intervalMinutes: number,
 ): { durationHours: number; endTime: string } {
   if (selectedSlots.length === 0) {
     return { durationHours: 8, endTime: '07:00' };
@@ -197,7 +198,7 @@ export function sleepDefaultsFromSelection(
   // Quarter-hour precision so a 7h30 night stays 7.5h.
   const durationHours = Math.max(
     1,
-    Math.round((selectedSlots.length * intervalMinutes) / 15) / 4,
+    Math.round(selectedSlots.reduce((sum, slot) => sum + parseTimeToMinutes(slot.endTime) - parseTimeToMinutes(slot.startTime), 0) / 15) / 4,
   );
   return { durationHours, endTime };
 }

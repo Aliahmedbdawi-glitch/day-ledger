@@ -86,7 +86,7 @@ export function formatPoints(value: number): string {
 export function computeDayStats(data: AppData, date: string, now: Date = new Date()): DayStats {
   const { settings } = data;
   const interval = getIntervalForDate(data, date);
-  const slots = generateDaySlots(date, interval);
+  const slots = generateDaySlots(date, interval, data.logs);
   const activities = activityMap(data.activities);
   const sleepId = findSleepActivity(data.activities)?.id;
   const sleepLimitMinutes = Math.max(0, settings.sleepLimitHours) * 60;
@@ -104,6 +104,7 @@ export function computeDayStats(data: AppData, date: string, now: Date = new Dat
   let loggedCount = 0;
   let loggedElapsed = 0;
   let elapsedSlots = 0;
+  let elapsedMinutes = 0;
   let unrecordedMinutes = 0;
   let sleepMinutes = 0;
   let oversleepMinutes = 0;
@@ -118,21 +119,23 @@ export function computeDayStats(data: AppData, date: string, now: Date = new Dat
   };
 
   for (const slot of slots) {
+    const duration = parseTimeToMinutes(slot.endTime) - parseTimeToMinutes(slot.startTime);
     const elapsed = isElapsed(slot.endTime);
     if (elapsed) elapsedSlots += 1;
+    if (elapsed) elapsedMinutes += duration;
     const log = logsByStart.get(slot.startTime);
     if (!log) {
-      if (elapsed) unrecordedMinutes += interval;
+      if (elapsed) unrecordedMinutes += duration;
       continue;
     }
     loggedCount += 1;
-    if (elapsed) loggedElapsed += 1;
+    if (elapsed) loggedElapsed += duration;
     if (log.activityIds.length === 0) {
       slotPoints[slot.startTime] = 0;
       continue;
     }
 
-    const share = interval / log.activityIds.length;
+    const share = duration / log.activityIds.length;
     let pts = 0;
     for (const id of log.activityIds) {
       timeByActivityMinutes[id] = (timeByActivityMinutes[id] ?? 0) + share;
@@ -159,7 +162,7 @@ export function computeDayStats(data: AppData, date: string, now: Date = new Dat
   add(unrecordedPenalty);
 
   const netPoints = loggedCount === 0 ? null : Math.round(gained + lost);
-  const trackedPercent = elapsedSlots === 0 ? 0 : Math.round((loggedElapsed / elapsedSlots) * 100);
+  const trackedPercent = elapsedMinutes === 0 ? 0 : Math.round((loggedElapsed / elapsedMinutes) * 100);
   const goal = settings.dailyPointsGoal;
   const goalPercent =
     netPoints === null || goal <= 0 ? null : Math.round((netPoints / goal) * 100);

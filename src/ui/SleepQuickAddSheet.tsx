@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Activity, TimeSlot } from '../domain/types';
-import { formatDurationMinutes } from '../domain/dates';
+import { formatDurationMinutes, parseTimeToMinutes } from '../domain/dates';
 import {
   findSleepActivity,
   selectionFromSleepDefaults,
   sleepDefaultsFromSelection,
-  slotCountForHours,
   slotsBetweenInclusive,
 } from '../domain/sleep';
 import { Icon } from './Icon';
@@ -62,20 +61,17 @@ export function SleepQuickAddSheet({
     applyDefaults(sleepDefaults);
   }, [slots, intervalMinutes, sleepDefaults.durationHours, sleepDefaults.endTime]);
 
-  const applyDuration = (hours: number) => {
-    const count = slotCountForHours(hours, intervalMinutes);
-    const end = Math.min(endIndex, slots.length - 1);
-    const start = Math.max(0, end - count + 1);
-    const picked = slotsBetweenInclusive(slots, start, end);
+  const applyDuration = (hours: number, end = endIndex) => {
+    const selection = selectionFromSleepDefaults(slots, intervalMinutes, hours, slots[end].endTime);
     setActiveDuration(hours);
-    setSelected(new Set(picked.map(slotKey)));
+    setSelected(selection.selectedStartTimes);
   };
 
   const applyRange = (fromIndex: number, toIndex: number) => {
     const picked = slotsBetweenInclusive(slots, fromIndex, toIndex);
     setSelected(new Set(picked.map(slotKey)));
     setEndIndex(Math.max(fromIndex, toIndex));
-    setActiveDuration(Math.round((picked.length * intervalMinutes) / 60));
+    setActiveDuration(Math.round(picked.reduce((sum, slot) => sum + parseTimeToMinutes(slot.endTime) - parseTimeToMinutes(slot.startTime), 0) / 60));
   };
 
   const toggle = (slot: TimeSlot) => {
@@ -93,7 +89,7 @@ export function SleepQuickAddSheet({
     [slots, selected],
   );
 
-  const totalMinutes = selectedSlots.length * intervalMinutes;
+  const totalMinutes = selectedSlots.reduce((sum, slot) => sum + parseTimeToMinutes(slot.endTime) - parseTimeToMinutes(slot.startTime), 0);
 
   const handleSave = () => {
     if (selectedSlots.length === 0) return;
@@ -148,7 +144,7 @@ export function SleepQuickAddSheet({
               onChange={(e) => {
                 const idx = Number(e.target.value);
                 setEndIndex(idx);
-                applyDuration(activeDuration);
+                applyDuration(activeDuration, idx);
               }}
             >
               {slots.map((s) => (
@@ -182,7 +178,7 @@ export function SleepQuickAddSheet({
               type="button"
               className="btn btn-ghost"
               onClick={() =>
-                applyRange(0, Math.min(slots.length - 1, slotCountForHours(8, intervalMinutes) - 1))
+                applyRange(0, Math.max(0, slots.findLastIndex(slot => parseTimeToMinutes(slot.endTime) <= 8 * 60)))
               }
             >
               Early morning block

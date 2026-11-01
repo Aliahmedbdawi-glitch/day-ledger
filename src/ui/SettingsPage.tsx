@@ -197,12 +197,12 @@ export function SettingsPage() {
       <div className="card settings-group">
         <h3>Time interval</h3>
         <p className="muted">
-          Today uses {getIntervalForDate(data, todayKey())}-minute intervals. {data.logs.some(log => log.date === todayKey()) ? 'Today has saved records, so changes apply from tomorrow. Existing records keep their interval length.' : 'Changes apply to today immediately.'}
+          Today uses {getIntervalForDate(data, todayKey())}-minute intervals. Changes apply to unrecorded time today immediately. Saved entries keep their original times and durations.
         </p>
         <label>
           Interval length
           <select
-            value={settings.defaultIntervalMinutes}
+            value={getIntervalForDate(data, todayKey())}
             onChange={(e) => setDefaultInterval(Number(e.target.value) as IntervalMinutes)}
             style={{ display: 'block', marginTop: '0.35rem', padding: '0.4rem' }}
           >

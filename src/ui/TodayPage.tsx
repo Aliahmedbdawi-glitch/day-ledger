@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useStore, useSortedCatalog } from '../data/store';
-import { addDays, formatDisplayDate, formatDurationMinutes, todayKey } from '../domain/dates';
+import { addDays, formatDisplayDate, formatDurationMinutes, parseTimeToMinutes, todayKey } from '../domain/dates';
 import {
   findLog,
   generateDaySlots,
@@ -39,7 +39,7 @@ export function TodayPage({ openSlot }: { openSlot?: OpenSlotRequest }) {
   const [viewDate, setViewDate] = useState(() => openSlot?.date ?? todayKey());
   const [activeSlot, setActiveSlot] = useState<TimeSlot | null>(() => {
     if (!openSlot) return null;
-    const daySlots = generateDaySlots(openSlot.date, getIntervalForDate(data, openSlot.date));
+    const daySlots = generateDaySlots(openSlot.date, getIntervalForDate(data, openSlot.date), data.logs);
     return daySlots.find((s) => s.startTime === openSlot.startTime) ?? null;
   });
   const [dismissedForSlot, setDismissedForSlot] = useState<string | null>(null);
@@ -56,8 +56,8 @@ export function TodayPage({ openSlot }: { openSlot?: OpenSlotRequest }) {
 
   const interval = getIntervalForDate(data, viewDate);
   const slots = useMemo(
-    () => generateDaySlots(viewDate, interval),
-    [viewDate, interval],
+    () => generateDaySlots(viewDate, interval, data.logs),
+    [viewDate, interval, data.logs],
   );
   const isToday = viewDate === todayKey();
   const currentSlot = isToday ? getCurrentSlot(slots, now) : undefined;
@@ -200,7 +200,7 @@ export function TodayPage({ openSlot }: { openSlot?: OpenSlotRequest }) {
             <span className="muted">
               Earliest <span className="mono">{unrecorded[0].startTime}–{unrecorded[0].endTime}</span>
               {settings.unrecordedPenaltyPerHour > 0 &&
-                ` · costing ${formatPoints(-(unrecorded.length * interval * settings.unrecordedPenaltyPerHour) / 60)} pts`}
+                ` · costing ${formatPoints(-(unrecorded.reduce((sum, slot) => sum + parseTimeToMinutes(slot.endTime) - parseTimeToMinutes(slot.startTime), 0) * settings.unrecordedPenaltyPerHour) / 60)} pts`}
             </span>
           </div>
           <div className="catch-up-actions">

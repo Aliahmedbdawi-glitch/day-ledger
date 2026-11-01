@@ -23,16 +23,26 @@ final class WidgetData {
       JSONArray acts=data.getJSONArray("activities"), habits=data.getJSONArray("habits"), logs=data.getJSONArray("logs"), pending=edits(c);
       Map<String,String> names=new HashMap<>();
       for(int i=0;i<acts.length();i++) { JSONObject a=acts.getJSONObject(i); names.put(a.getString("id"),a.getString("name")); }
-      for(int start=0; start<1440; start+=interval) {
+      for(int start=0; start<1440;) {
+        int end=Math.min(1440, (start/interval+1)*interval), savedEnd=-1;
+        for(int i=0;i<logs.length();i++) {
+          JSONObject log=logs.getJSONObject(i);
+          if(!date.equals(log.optString("date")))continue;
+          int from=minutes(log.getString("startTime"));
+          if(from==start)savedEnd=minutes(log.getString("endTime"));
+          else if(from>start)end=Math.min(end,from);
+        }
+        if(savedEnd>start)end=savedEnd;
         String clock=time(start); Set<String> done=new LinkedHashSet<>();
         for(int i=0;i<logs.length();i++){JSONObject l=logs.getJSONObject(i); if(date.equals(l.optString("date")) && clock.equals(l.optString("startTime"))) { JSONArray ids=l.getJSONArray("activityIds"); for(int j=0;j<ids.length();j++)done.add(ids.getString(j)); }}
         for(int i=0;i<pending.length();i++){JSONObject e=pending.getJSONObject(i); if(date.equals(e.optString("date")) && clock.equals(e.optString("startTime"))) { if(e.getBoolean("done"))done.add(e.getString("activityId")); else done.remove(e.getString("activityId")); }}
-        JSONObject row=new JSONObject().put("date",date).put("startTime",clock).put("endTime",time(Math.min(1440,start+interval)));
+        JSONObject row=new JSONObject().put("date",date).put("startTime",clock).put("endTime",time(end));
         JSONArray hs=new JSONArray();
-        for(int i=0;i<habits.length();i++){JSONObject h=habits.getJSONObject(i); int m=minutes(h.getString("startTime")); String id=h.getString("activityId"); if(m>=start && m<start+interval && names.containsKey(id))hs.put(new JSONObject().put("activityId",id).put("name",names.get(id)).put("done",done.contains(id))); }
+        for(int i=0;i<habits.length();i++){JSONObject h=habits.getJSONObject(i); int m=minutes(h.getString("startTime")); String id=h.getString("activityId"); if(m>=start && m<end && names.containsKey(id))hs.put(new JSONObject().put("activityId",id).put("name",names.get(id)).put("done",done.contains(id))); }
         Set<String> habitIds=new HashSet<>(); for(int i=0;i<hs.length();i++)habitIds.add(hs.getJSONObject(i).getString("activityId"));
         List<String> labels=new ArrayList<>(); for(String id:done) if(names.containsKey(id) && !habitIds.contains(id))labels.add(names.get(id));
         rows.put(row.put("actions",android.text.TextUtils.join(", ",labels)).put("habits",hs));
+        start=end;
       }
       return rows;
     }

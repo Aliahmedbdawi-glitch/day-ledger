@@ -42,7 +42,7 @@ export function useIntervalNotifications(data: AppData): void {
       const current = dataRef.current;
       const now = new Date();
       const today = todayKey();
-      const slots = generateDaySlots(today, getIntervalForDate(current, today));
+      const slots = generateDaySlots(today, getIntervalForDate(current, today), current.logs);
       const slot = getCurrentSlot(slots, now);
       if (!slot || slot.index === 0) return;
 
