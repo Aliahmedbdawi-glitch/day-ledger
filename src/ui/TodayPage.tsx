@@ -45,13 +45,11 @@ export function TodayPage({ openSlot }: { openSlot?: OpenSlotRequest }) {
   const [dismissedForSlot, setDismissedForSlot] = useState<string | null>(null);
   const [sleepOpen, setSleepOpen] = useState(false);
   const [pickerSlot, setPickerSlot] = useState<TimeSlot | null>(null);
-  const nowRef = useRef(new Date());
-  const [, tick] = useState(0);
+  const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
     const id = setInterval(() => {
-      nowRef.current = new Date();
-      tick((n) => n + 1);
+      setNow(new Date());
     }, 60_000);
     return () => clearInterval(id);
   }, []);
@@ -61,7 +59,6 @@ export function TodayPage({ openSlot }: { openSlot?: OpenSlotRequest }) {
     () => generateDaySlots(viewDate, interval),
     [viewDate, interval],
   );
-  const now = nowRef.current;
   const isToday = viewDate === todayKey();
   const currentSlot = isToday ? getCurrentSlot(slots, now) : undefined;
   const dayStats = computeDayStats(data, viewDate, now);
@@ -113,13 +110,13 @@ export function TodayPage({ openSlot }: { openSlot?: OpenSlotRequest }) {
 
   const renderSlotLabel = (slot: TimeSlot) => {
     const log = findLog(data.logs, slot);
-    if (!log) return <span className="muted">Not recorded</span>;
-    if (log.activityIds.length === 0) {
-      return <span className="muted">Recorded (no activities)</span>;
-    }
+    if (!log) return <span className="muted">+ Action</span>;
+    const habitIds = new Set(habitsInSlot(data.habits, slot).map(h => h.activityId));
+    const actionIds = log.activityIds.filter(id => !habitIds.has(id));
+    if (actionIds.length === 0) return <span className="muted">+ Action</span>;
     return (
       <>
-        {log.activityIds.map((id) => {
+        {actionIds.map((id) => {
           const act = activityById.get(id);
           const cat = act ? categoryById.get(act.categoryId) : undefined;
           return (
@@ -259,10 +256,10 @@ export function TodayPage({ openSlot }: { openSlot?: OpenSlotRequest }) {
                 role="listitem"
               >
                 <span className="strip-time mono">{slot.startTime}</span>
-                <button type="button" className="strip-hit" onClick={() => setActiveSlot(slot)}>
+                <button type="button" className="strip-hit" aria-label={`Edit actions for ${slot.startTime}`} onClick={() => setActiveSlot(slot)}>
                   <span className="strip-body">
                     {renderSlotLabel(slot)}
-                    {pts !== undefined && Math.round(pts) !== 0 && (
+                    {tasks.length === 0 && pts !== undefined && Math.round(pts) !== 0 && (
                       <span className={`slot-points mono ${pointsClass(pts)}`}>{formatPoints(pts)}</span>
                     )}
                   </span>

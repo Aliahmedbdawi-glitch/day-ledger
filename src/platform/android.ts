@@ -8,6 +8,7 @@ import { planReminders } from '../domain/reminders';
 export const isAndroid = Capacitor.getPlatform() === 'android';
 
 const CHANNEL_ID = 'interval-reminders';
+const TEST_NOTIFICATION_ID = 900000001;
 let channelReady = false;
 
 async function ensureChannel(): Promise<void> {
@@ -47,15 +48,35 @@ export async function openExactAlarmSettings(): Promise<void> {
   await LocalNotifications.changeExactNotificationSetting();
 }
 
+export async function testNotification(): Promise<void> {
+  if (!(await requestNotificationPermission())) throw new Error('Notifications are blocked. Allow them in Android settings first.');
+  await ensureChannel();
+  await LocalNotifications.schedule({ notifications: [{
+    id: TEST_NOTIFICATION_ID,
+    title: 'Day Ledger · Notification test',
+    body: 'Your phone received this reminder successfully.',
+    channelId: CHANNEL_ID,
+    smallIcon: 'ic_stat_notify',
+    schedule: { at: new Date(Date.now() + 10_000), allowWhileIdle: true },
+  }] });
+}
+
 /**
  * Replaces every pending reminder with a fresh plan for the next 24h.
  * Called on launch, on resume and whenever logs or settings change.
  */
-export async function syncReminders(data: AppData): Promise<void> {
+let reminderQueue: Promise<void> = Promise.resolve();
+export function syncReminders(data: AppData): Promise<void> {
+  const run = reminderQueue.catch(() => undefined).then(() => replaceReminders(data));
+  reminderQueue = run;
+  return run;
+}
+
+async function replaceReminders(data: AppData): Promise<void> {
   if (!isAndroid) return;
   const pending = await LocalNotifications.getPending();
   if (pending.notifications.length > 0) {
-    await LocalNotifications.cancel({ notifications: pending.notifications.map((n) => ({ id: n.id })) });
+    await LocalNotifications.cancel({ notifications: pending.notifications.filter(n => n.id !== TEST_NOTIFICATION_ID).map((n) => ({ id: n.id })) });
   }
   const plan = planReminders(data, new Date());
   if (plan.length === 0) return;

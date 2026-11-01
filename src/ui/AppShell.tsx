@@ -23,22 +23,13 @@ const NAV: { id: PageId; label: string; icon: IconName }[] = [
   { id: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
-type Theme = 'system' | 'light' | 'dark';
+import type { Theme } from '../domain/types';
 const THEME_KEY = 'day-ledger-theme';
 const THEMES: { id: Theme; icon: IconName; label: string }[] = [
   { id: 'light', icon: 'sun', label: 'Light theme' },
   { id: 'system', icon: 'system', label: 'Match system theme' },
   { id: 'dark', icon: 'moon', label: 'Dark theme' },
 ];
-
-function readTheme(): Theme {
-  try {
-    const v = localStorage.getItem(THEME_KEY);
-    return v === 'light' || v === 'dark' ? v : 'system';
-  } catch {
-    return 'system';
-  }
-}
 
 interface OpenRequest extends OpenSlotRequest {
   nonce: number;
@@ -66,9 +57,11 @@ function PageContent({ page, openRequest }: { page: PageId; openRequest: OpenReq
 
 export function AppShell() {
   const [page, setPage] = useState<PageId>('today');
-  const [theme, setTheme] = useState<Theme>(readTheme);
+
   const [openRequest, setOpenRequest] = useState<OpenRequest | null>(null);
-  const { data } = useStore();
+  const { data, updateSettings } = useStore();
+  const theme = data.settings.theme;
+  const setTheme = (theme: Theme) => updateSettings({ theme });
   useIntervalNotifications(data);
   useAndroidReminders(data);
 

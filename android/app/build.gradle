@@ -31,6 +31,10 @@ android {
         }
     }
     buildTypes {
+        debug {
+            applicationIdSuffix ".preview"
+            versionNameSuffix "-preview"
+        }
         release {
             if (System.getenv("ANDROID_KEYSTORE_PATH")) {
                 signingConfig signingConfigs.release

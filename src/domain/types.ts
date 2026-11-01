@@ -29,7 +29,10 @@ export interface IntervalLog {
   source?: 'auto';
 }
 
+export type Theme = 'system' | 'light' | 'dark' | 'forest' | 'sand';
+
 export interface Settings {
+  theme: Theme;
   defaultIntervalMinutes: IntervalMinutes;
   notificationsEnabled: boolean;
   trackedDayTargetPercent: number;
@@ -68,6 +71,8 @@ export interface DailyHabit {
 }
 
 export interface AppData {
+  /** Widget operations saved atomically with their changes, for crash-safe replay. */
+  appliedWidgetEdits?: string[];
   version: number;
   categories: Category[];
   activities: Activity[];

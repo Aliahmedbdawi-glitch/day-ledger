@@ -39,6 +39,27 @@ Keep the keystore backed up. Phones only accept an update signed with the same k
 
 **Local build** (needs JDK 21 and the Android SDK): `npm run android:sync`, then open `android/` in Android Studio.
 
-## Windows app
+## Android widget and updates
+
+After opening the updated Android app once, long-press the phone home screen and
+choose **Widgets → Day Ledger timeline**. The resizable widget shows today's
+intervals, logged actions and daily habits. Tap a habit to check or uncheck it.
+Changes are saved by Android even while the app is closed, and merged into the
+app when it next opens. The title opens the app. Android refreshes the date
+periodically; opening the app also refreshes the widget.
+
+**Settings → Update app** downloads the published APK and checks its package,
+signing certificate and version before opening Android's installer. Android may
+ask you to allow updates from Day Ledger. Install over the existing app; do not
+uninstall it. The first version containing this button still needs to be
+installed using the existing APK download flow. Release builds must continue to
+use the same signing key and increasing build numbers.
+
+Native device checks before release: add/resize the widget; complete and undo
+multiple habits with the app closed; reopen and confirm logs/points; test across
+midnight; deny notification/install permission and retry; install a newer signed
+APK over an older signed build and confirm existing history is retained.
+
+## Windows packaging
 
 `npm run dist` builds `release/DayLedger-Setup-<version>.exe` (Electron) with native notifications and a tray icon.

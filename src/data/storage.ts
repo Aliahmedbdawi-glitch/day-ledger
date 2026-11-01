@@ -6,6 +6,7 @@ const STORAGE_KEY = 'day-ledger-v1';
 
 export function defaultSettings(): Settings {
   return {
+    theme: 'system',
     defaultIntervalMinutes: 30,
     notificationsEnabled: true,
     trackedDayTargetPercent: 80,
@@ -43,6 +44,8 @@ export function loadData(): AppData {
     const parsed = JSON.parse(raw) as AppData;
     if (parsed.version !== 1) return createEmptyData();
     const taskLayout = parsed.settings?.taskLayout;
+    const savedTheme = parsed.settings?.theme ?? localStorage.getItem('day-ledger-theme');
+    const theme = ['light', 'dark', 'forest', 'sand'].includes(savedTheme ?? '') ? savedTheme as Settings['theme'] : 'system';
     return {
       ...createEmptyData(),
       ...parsed,
@@ -50,6 +53,7 @@ export function loadData(): AppData {
         ...defaultSettings(),
         ...parsed.settings,
         taskLayout: readTaskLayout(taskLayout),
+        theme,
       },
       habits: Array.isArray(parsed.habits) ? parsed.habits : [],
     };

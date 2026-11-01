@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
   type ReactNode,
 } from 'react';
 import type {
@@ -17,11 +18,13 @@ import type {
   Settings,
   TimeSlot,
 } from '../domain/types';
-import { addDays, todayKey } from '../domain/dates';
+import { applyIntervalChange } from '../domain/grid';
 import { withHabitAdded, withHabitToggled } from '../domain/habits';
 import { applyAutoSleep, ensureSleepActivity, findSleepActivity } from '../domain/sleep';
 import { createExampleSeed } from './seed';
 import { loadData, saveData } from './storage';
+import { Phone, applyWidgetEdits } from '../platform/phone';
+import { isAndroid, onAppResume } from '../platform/android';
 
 interface StoreValue {
   data: AppData;
@@ -57,32 +60,35 @@ function sortActivities(activities: Activity[]): Activity[] {
   return [...activities].sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
-function hasLogsOnDate(data: AppData, date: string): boolean {
-  return data.logs.some((l) => l.date === date);
-}
-
-function applyIntervalChange(data: AppData, minutes: IntervalMinutes): AppData {
-  const today = todayKey();
-  const next = { ...data, settings: { ...data.settings, defaultIntervalMinutes: minutes } };
-  if (!hasLogsOnDate(data, today)) {
-    return {
-      ...next,
-      dayIntervalMinutes: { ...data.dayIntervalMinutes, [today]: minutes },
-    };
-  }
-  const tomorrow = addDays(today, 1);
-  return {
-    ...next,
-    dayIntervalMinutes: { ...data.dayIntervalMinutes, [tomorrow]: minutes },
-  };
-}
-
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(() => loadData());
+  const latest = useRef(data);
+  const syncing = useRef(false);
 
   useEffect(() => {
     saveData(data);
+    latest.current = data;
   }, [data]);
+
+  useEffect(() => {
+    if (!isAndroid) return;
+    const sync = async () => {
+      if (syncing.current) return;
+      syncing.current = true;
+      try {
+        const result = await Phone.sync({ data: JSON.stringify(latest.current), acknowledged: latest.current.appliedWidgetEdits ?? [] });
+        if (result.edits.length) {
+          const recordedAt = new Date().toISOString();
+          setData(prev => applyWidgetEdits(prev, result.edits, recordedAt));
+        }
+      } catch (error) { console.error('Widget synchronization failed', error); }
+      finally { syncing.current = false; }
+    };
+    void sync();
+    const timer = window.setInterval(() => void sync(), 2000);
+    const off = onAppResume(() => void sync());
+    return () => { clearInterval(timer); off(); };
+  }, []);
 
   const persist = useCallback((updater: (prev: AppData) => AppData) => {
     setData((prev) => updater(prev));

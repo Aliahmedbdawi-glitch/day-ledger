@@ -1,21 +1,26 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../data/store';
-import { parseTimeToMinutes } from '../domain/dates';
+import { parseTimeToMinutes, todayKey } from '../domain/dates';
+import { getIntervalForDate } from '../domain/grid';
 import { minutesToTime, sleepWindow } from '../domain/sleep';
 import { INTERVAL_OPTIONS, type IntervalMinutes } from '../domain/types';
 import { desktop, type DesktopSettings } from '../platform/desktop';
+import { Phone } from '../platform/phone';
 import {
   exactAlarmsAllowed,
   isAndroid,
   notificationPermission,
   openExactAlarmSettings,
   requestNotificationPermission,
+  testNotification,
+  onAppResume,
 } from '../platform/android';
 
 const ANDROID_APK =
   'https://github.com/Aliahmedbdawi-glitch/day-ledger/releases/download/android-latest/DayLedger.apk';
 
 function AndroidRemindersCard() {
+  const [testMessage, setTestMessage] = useState('');
   const [permission, setPermission] = useState<'granted' | 'denied' | 'prompt' | null>(null);
   const [exact, setExact] = useState<boolean | null>(null);
 
@@ -24,10 +29,16 @@ function AndroidRemindersCard() {
     exactAlarmsAllowed().then(setExact).catch(() => undefined);
   };
   useEffect(refresh, []);
+  useEffect(() => onAppResume(refresh), []);
 
   return (
     <div className="card settings-group">
       <h3>Phone reminders</h3>
+      <button className="btn" type="button" onClick={async () => {
+        try { await testNotification(); setTestMessage('Test scheduled. Go to your home screen; it should arrive in about 10 seconds.'); }
+        catch (error) { setTestMessage(error instanceof Error ? error.message : 'Could not schedule a test notification.'); }
+      }}>Test notification</button>
+      {testMessage && <p role="status">{testMessage}</p>}
       <p className="muted">
         Reminders are scheduled with Android for the next 24 hours, so they arrive even when the app
         is closed. Opening the app refreshes them.
@@ -63,6 +74,23 @@ function AndroidRemindersCard() {
       </p>
     </div>
   );
+}
+
+function PhoneToolsCard() {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  return <div className="card settings-group">
+    <h3>Home-screen widget & updates</h3>
+    <p className="muted">Long-press your phone home screen, choose Widgets, then Day Ledger. Tap a habit to mark it done. Changes sync when you open the app.</p>
+    <p className="muted">Update your existing app without uninstalling it. Android will ask you to confirm installation.</p>
+    <button className="btn btn-primary" type="button" disabled={busy} onClick={async () => {
+      setBusy(true); setMessage('Downloading and checking the latest release…');
+      try { setMessage((await Phone.update()).message); }
+      catch (error) { setMessage(error instanceof Error ? error.message : 'Update failed. Check your connection and try again.'); }
+      finally { setBusy(false); }
+    }}>{busy ? 'Checking update…' : 'Update app'}</button>
+    {message && <p role="status">{message}</p>}
+  </div>;
 }
 
 function DesktopSettingsCard() {
@@ -141,6 +169,17 @@ export function SettingsPage() {
         <h1 className="page-title">Settings</h1>
       </div>
 
+      <div className="card settings-group">
+        <h3>Appearance</h3>
+        <p className="muted">Choose a theme for the app and your home-screen widget.</p>
+        <div className="theme-options" role="group" aria-label="Color theme">
+          {(['system', 'light', 'dark', 'forest', 'sand'] as const).map(theme => (
+            <button key={theme} type="button" className="btn" aria-pressed={settings.theme === theme} onClick={() => updateSettings({ theme })}>
+              {theme === 'system' ? 'System' : theme.charAt(0).toUpperCase() + theme.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
       {!isAndroid && (
         <div className="card settings-group">
           <h3>Install</h3>
@@ -158,7 +197,7 @@ export function SettingsPage() {
       <div className="card settings-group">
         <h3>Time interval</h3>
         <p className="muted">
-          Default slot length for new days. If today already has logs, changes apply from tomorrow.
+          Today uses {getIntervalForDate(data, todayKey())}-minute intervals. {data.logs.some(log => log.date === todayKey()) ? 'Today has saved records, so changes apply from tomorrow. Existing records keep their interval length.' : 'Changes apply to today immediately.'}
         </p>
         <label>
           Interval length
@@ -248,7 +287,7 @@ export function SettingsPage() {
 
       <div className="card settings-group">
         <h3>Notifications</h3>
-        <p className="muted">Reminders fire when a slot ends while this app is open. Status: {notifStatus}</p>
+        <p className="muted">{isAndroid ? 'Reminders are scheduled for interval endings, including while the app is closed.' : 'Reminders fire when a slot ends while the app is running.'} Status: {notifStatus}</p>
         <label className="check-row">
           <input
             type="checkbox"
@@ -282,6 +321,7 @@ export function SettingsPage() {
 
       {desktop && <DesktopSettingsCard />}
       {isAndroid && <AndroidRemindersCard />}
+      {isAndroid && <PhoneToolsCard />}
 
       <div className="card settings-group">
         <h3>Day assessment</h3>
@@ -336,7 +376,7 @@ export function SettingsPage() {
 
       <div className="card settings-group">
         <h3>Data</h3>
-        <p className="muted">All data is stored locally on this device only. Uninstalling the app keeps it unless you delete the Day Ledger folder in AppData.</p>
+        <p className="muted">All data is stored locally on this device. On Android, uninstalling deletes local data. Install updates over the existing app to keep your history.</p>
       </div>
     </div>
   );

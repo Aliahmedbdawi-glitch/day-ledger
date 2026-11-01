@@ -1,5 +1,5 @@
 import type { AppData, IntervalLog, IntervalMinutes, TimeSlot } from './types';
-import { parseTimeToMinutes, todayKey } from './dates';
+import { addDays, formatDateKey, parseTimeToMinutes, todayKey } from './dates';
 
 export function padTime(h: number, m: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
@@ -29,7 +29,14 @@ export function generateDaySlots(date: string, intervalMinutes: number): TimeSlo
 }
 
 export function getIntervalForDate(data: AppData, date: string): IntervalMinutes {
-  return data.dayIntervalMinutes[date] ?? data.settings.defaultIntervalMinutes;
+  const saved = data.dayIntervalMinutes[date];
+  if (saved) return saved;
+  const log = data.logs.find(l => l.date === date);
+  if (log) {
+    const length = parseTimeToMinutes(log.endTime) - parseTimeToMinutes(log.startTime);
+    if ([5, 10, 15, 20, 30, 60].includes(length)) return length as IntervalMinutes;
+  }
+  return data.settings.defaultIntervalMinutes;
 }
 
 export function logKey(date: string, startTime: string): string {
@@ -46,7 +53,7 @@ export function isSlotRecorded(logs: IntervalLog[], slot: TimeSlot): boolean {
 
 export function getCurrentSlot(slots: TimeSlot[], now: Date): TimeSlot | undefined {
   if (slots.length === 0) return undefined;
-  const dateKey = todayKey();
+  const dateKey = formatDateKey(now);
   if (slots[0].date !== dateKey) return undefined;
   const nowMin = now.getHours() * 60 + now.getMinutes();
   return slots.find((s) => {
@@ -72,4 +79,15 @@ export function getPreviousSlot(slots: TimeSlot[], slot: TimeSlot): TimeSlot | u
   const idx = slots.findIndex((s) => s.startTime === slot.startTime);
   if (idx <= 0) return undefined;
   return slots[idx - 1];
+}
+
+/** Preserve recorded days when changing the default grid. */
+export function applyIntervalChange(data: AppData, minutes: IntervalMinutes, today = todayKey()): AppData {
+  const recordedDates = new Set(data.logs.map(log => log.date));
+  const dayIntervalMinutes = { ...data.dayIntervalMinutes };
+  for (const date of recordedDates) dayIntervalMinutes[date] = getIntervalForDate(data, date);
+  if (!recordedDates.has(today)) dayIntervalMinutes[today] = minutes;
+  const tomorrow = addDays(today, 1);
+  if (!recordedDates.has(tomorrow)) dayIntervalMinutes[tomorrow] = minutes;
+  return { ...data, dayIntervalMinutes, settings: { ...data.settings, defaultIntervalMinutes: minutes } };
 }

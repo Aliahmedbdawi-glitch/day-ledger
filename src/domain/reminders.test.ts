@@ -18,6 +18,12 @@ function makeData(overrides: Partial<AppData['settings']> = {}): AppData {
 }
 
 describe('planReminders', () => {
+  it('covers a full day when five-minute intervals are selected', () => {
+    const now = new Date(2026, 9, 14, 9, 0);
+    const plan = planReminders(makeData({ defaultIntervalMinutes: 5, quietDuringSleep: false }), now);
+    expect(plan).toHaveLength(288);
+    expect(plan.at(-1)?.at.getTime()).toBe(now.getTime() + 24 * 60 * 60 * 1000);
+  });
   it('schedules interval ends for the next day and stays silent overnight', () => {
     const now = new Date(2026, 9, 14, 20, 10);
     const plan = planReminders(makeData(), now);

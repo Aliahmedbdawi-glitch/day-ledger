@@ -24,6 +24,7 @@ export function SlotTasks({
 }) {
   return (
     <div className={`slot-tasks${tasks.length === 0 ? ' is-empty' : ''}`}>
+      <div className="habit-scroll">
       {tasks.map((task) => (
         <div
           key={task.id}
@@ -45,14 +46,15 @@ export function SlotTasks({
           <button
             type="button"
             className="task-remove"
-            aria-label={`Remove daily task ${task.name}`}
+            aria-label={`Remove daily habit ${task.name}`}
             onClick={() => onRemove(task.id, task.name)}
           >
             <Icon name="close" size={14} />
           </button>
         </div>
       ))}
-      <button type="button" className="task-add" aria-label="Add daily task" onClick={onAdd}>
+      </div>
+      <button type="button" className="task-add" aria-label="Add daily habit" onClick={onAdd}>
         <Icon name="plus" size={14} />
       </button>
     </div>
@@ -106,9 +108,9 @@ export function TaskPicker({
       <div className="record-sheet" role="dialog" aria-labelledby="task-picker-title">
         <div className="sheet-header">
           <div>
-            <h3 id="task-picker-title">Daily task</h3>
+            <h3 id="task-picker-title">Daily habit</h3>
             <p className="muted" style={{ margin: '0.25rem 0 0' }}>
-              Shows every day at <span className="mono">{slot.startTime}</span>. The full name stays in the box.
+              Shows every day at <span className="mono">{slot.startTime}</span>. Choose from the same list as your actions.
             </p>
           </div>
           <button type="button" className="btn btn-ghost btn-icon" onClick={onClose} aria-label="Close">
@@ -117,7 +119,7 @@ export function TaskPicker({
         </div>
 
         <label className="task-search">
-          <span className="muted">Find an activity</span>
+          <span className="muted">Find an action</span>
           <input
             type="text"
             value={query}

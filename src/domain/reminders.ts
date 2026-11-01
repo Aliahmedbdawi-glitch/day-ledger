@@ -26,7 +26,7 @@ export function planReminders(
   data: AppData,
   now: Date,
   horizonHours = 24,
-  max = 96,
+  max = 288,
 ): PlannedReminder[] {
   const { settings } = data;
   if (!settings.notificationsEnabled) return [];
